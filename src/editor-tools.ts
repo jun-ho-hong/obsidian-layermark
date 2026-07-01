@@ -13,6 +13,14 @@ export const DEFAULT_STYLE: AnnotationStyleState = {
 };
 
 const TOOL_SHORTCUTS: Record<string, EditorTool> = {
+  "1": "select",
+  "2": "pen",
+  "3": "text",
+  "4": "highlight",
+  "5": "rectangle",
+  "6": "ellipse",
+  "7": "arrow",
+  "8": "badge",
   v: "select",
   s: "select",
   p: "pen",
@@ -37,7 +45,7 @@ export function normalizeStrokeWidth(value: number): number {
 }
 
 export function normalizeFontSize(value: number): number {
-  return Math.min(144, Math.max(8, Math.round(value)));
+  return Math.min(220, Math.max(12, Math.round(value)));
 }
 
 export type ArrowPathPoint = {

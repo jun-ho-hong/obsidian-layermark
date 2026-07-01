@@ -130,6 +130,25 @@
   font-size: 12px;
 }
 
+.skitch-layer-font-family-input {
+  width: 72px;
+  height: 30px;
+  font-size: 12px;
+}
+
+.skitch-layer-bold-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 7px;
+  font-weight: 800;
+}
+
+.skitch-layer-bold-button.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
 .skitch-layer-actions {
   margin-left: auto;
   border: 0;
@@ -165,6 +184,7 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   position: relative;
+  user-select: none;
 }
 
 .skitch-layer-stage-inner {
@@ -188,10 +208,12 @@
 }
 
 .skitch-layer-fabric-stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   padding: 24px;
+}
+
+.skitch-layer-fabric-stage.is-panning {
+  cursor: grabbing;
 }
 
 .skitch-layer-fabric-stage .canvas-container {
@@ -208,6 +230,7 @@
   position: relative;
   flex: 0 0 auto;
   overflow: hidden;
+  margin: 0 auto;
   background: var(--background-primary);
   border-radius: 4px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);

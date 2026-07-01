@@ -3,6 +3,14 @@ import { createArrowPathData, nextBadgeNumber, normalizeFontSize, normalizeStrok
 
 describe("editor tools", () => {
   it("maps keyboard shortcuts to tools", () => {
+    expect(toolFromShortcut("1")).toBe("select");
+    expect(toolFromShortcut("2")).toBe("pen");
+    expect(toolFromShortcut("3")).toBe("text");
+    expect(toolFromShortcut("4")).toBe("highlight");
+    expect(toolFromShortcut("5")).toBe("rectangle");
+    expect(toolFromShortcut("6")).toBe("ellipse");
+    expect(toolFromShortcut("7")).toBe("arrow");
+    expect(toolFromShortcut("8")).toBe("badge");
     expect(toolFromShortcut("v")).toBe("select");
     expect(toolFromShortcut("P")).toBe("pen");
     expect(toolFromShortcut("t")).toBe("text");
@@ -21,8 +29,8 @@ describe("editor tools", () => {
   it("normalizes editable style values", () => {
     expect(normalizeStrokeWidth(0)).toBe(1);
     expect(normalizeStrokeWidth(99)).toBe(32);
-    expect(normalizeFontSize(2)).toBe(8);
-    expect(normalizeFontSize(999)).toBe(144);
+    expect(normalizeFontSize(2)).toBe(12);
+    expect(normalizeFontSize(999)).toBe(220);
   });
 
   it("creates a single serializable path for arrows", () => {

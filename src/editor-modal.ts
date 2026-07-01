@@ -1,4 +1,4 @@
-import { Canvas, Circle, Ellipse, Path, PencilBrush, Polyline, Rect, Textbox, type FabricObject } from "fabric";
+import { Canvas, Circle, Ellipse, Path, PencilBrush, Polyline, Rect, Shadow, Text, Textbox, type FabricObject } from "fabric";
 import { Modal, Notice, setIcon, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
@@ -37,11 +37,17 @@ export class AnnotationEditorModal extends Modal {
   private colorInputEl: HTMLInputElement | null = null;
   private strokeInputEl: HTMLInputElement | null = null;
   private fontSizeInputEl: HTMLInputElement | null = null;
+  private fontFamilySelectEl: HTMLSelectElement | null = null;
+  private boldButtonEl: HTMLButtonElement | null = null;
   private drawingStart: Point | null = null;
   private previewObject: FabricObject | null = null;
   private zoom = 1;
   private resizeObserver: ResizeObserver | null = null;
   private style: AnnotationStyleState;
+  private textFontFamily = "var(--font-interface, sans-serif)";
+  private textBold = true;
+  private isPanning = false;
+  private panStart: { x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
 
   constructor(
     app: App,
@@ -69,14 +75,14 @@ export class AnnotationEditorModal extends Modal {
     toolbar.createDiv({ cls: "skitch-layer-toolbar-title", text: this.imageFile.name });
     const palette = toolbar.createDiv({ cls: "skitch-layer-tool-palette" });
     this.toolGroupEl = palette.createDiv({ cls: "skitch-layer-tool-group" });
-    this.addToolButton(this.toolGroupEl, "select", "선택", "mouse-pointer-2", "V");
-    this.addToolButton(this.toolGroupEl, "pen", "펜", "pen-line", "P");
-    this.addToolButton(this.toolGroupEl, "text", "텍스트", "type", "T");
-    this.addToolButton(this.toolGroupEl, "highlight", "강조표시", "highlighter", "H");
-    this.addToolButton(this.toolGroupEl, "rectangle", "사각형", "square", "R");
-    this.addToolButton(this.toolGroupEl, "ellipse", "원", "circle", "E");
-    this.addToolButton(this.toolGroupEl, "arrow", "화살표", "arrow-up-right", "A");
-    this.addToolButton(this.toolGroupEl, "badge", "배지", "badge-check", "B");
+    this.addToolButton(this.toolGroupEl, "select", "선택", "mouse-pointer-2", "1");
+    this.addToolButton(this.toolGroupEl, "pen", "펜", "pen-line", "2");
+    this.addToolButton(this.toolGroupEl, "text", "텍스트", "type", "3");
+    this.addToolButton(this.toolGroupEl, "highlight", "강조표시", "highlighter", "4");
+    this.addToolButton(this.toolGroupEl, "rectangle", "사각형", "square", "5");
+    this.addToolButton(this.toolGroupEl, "ellipse", "원", "circle", "6");
+    this.addToolButton(this.toolGroupEl, "arrow", "화살표", "arrow-up-right", "7");
+    this.addToolButton(this.toolGroupEl, "badge", "배지", "badge-check", "8");
     this.addStyleControls(palette.createDiv({ cls: "skitch-layer-style-controls" }));
     const actions = new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }));
     actions.addButton((button) => {
@@ -145,6 +151,8 @@ export class AnnotationEditorModal extends Modal {
     this.colorInputEl = null;
     this.strokeInputEl = null;
     this.fontSizeInputEl = null;
+    this.fontFamilySelectEl = null;
+    this.boldButtonEl = null;
     this.contentEl.empty();
   }
 
@@ -191,9 +199,10 @@ export class AnnotationEditorModal extends Modal {
 
     const fontSize = container.createEl("input", { cls: "skitch-layer-font-size-input" });
     fontSize.type = "number";
-    fontSize.min = "8";
-    fontSize.max = "144";
+    fontSize.min = "12";
+    fontSize.max = "220";
     fontSize.step = "1";
+    this.style.fontSize = normalizeFontSize(Math.max(this.style.fontSize, 56));
     fontSize.value = String(this.style.fontSize);
     fontSize.title = "Text size";
     fontSize.addEventListener("change", () => {
@@ -202,6 +211,34 @@ export class AnnotationEditorModal extends Modal {
       this.applyStyleToSelection();
     });
     this.fontSizeInputEl = fontSize;
+
+    const fontFamily = container.createEl("select", { cls: "skitch-layer-font-family-input" });
+    fontFamily.title = "Text font";
+    for (const [label, value] of [
+      ["기본", "var(--font-interface, sans-serif)"],
+      ["Sans", "Arial, Helvetica, sans-serif"],
+      ["Serif", "Georgia, serif"],
+      ["Mono", "Consolas, monospace"]
+    ]) {
+      fontFamily.createEl("option", { text: label, attr: { value } });
+    }
+    fontFamily.value = this.textFontFamily;
+    fontFamily.addEventListener("change", () => {
+      this.textFontFamily = fontFamily.value;
+      this.applyStyleToSelection();
+    });
+    this.fontFamilySelectEl = fontFamily;
+
+    const bold = container.createEl("button", { cls: "skitch-layer-bold-button", text: "B" });
+    bold.type = "button";
+    bold.title = "Bold text";
+    bold.toggleClass("is-active", this.textBold);
+    bold.addEventListener("click", () => {
+      this.textBold = !this.textBold;
+      bold.toggleClass("is-active", this.textBold);
+      this.applyStyleToSelection();
+    });
+    this.boldButtonEl = bold;
   }
 
   private setTool(tool: EditorTool): void {
@@ -382,6 +419,15 @@ export class AnnotationEditorModal extends Modal {
         return false;
       });
     }
+    for (const key of ["1", "2", "3", "4", "5", "6", "7", "8"]) {
+      this.scope.register([], key, () => {
+        const tool = toolFromShortcut(key);
+        if (tool) {
+          this.setTool(tool);
+        }
+        return false;
+      });
+    }
     this.scope.register([], "-", () => {
       this.setZoom(this.zoom / 1.2);
       return false;
@@ -406,6 +452,45 @@ export class AnnotationEditorModal extends Modal {
       },
       { passive: false }
     );
+    this.stageEl?.addEventListener("pointerdown", (event) => {
+      if (!this.stageEl || (event.button !== 1 && !event.shiftKey && !event.altKey)) {
+        return;
+      }
+      event.preventDefault();
+      this.isPanning = true;
+      this.panStart = {
+        x: event.clientX,
+        y: event.clientY,
+        scrollLeft: this.stageEl.scrollLeft,
+        scrollTop: this.stageEl.scrollTop
+      };
+      this.stageEl.setPointerCapture(event.pointerId);
+      this.stageEl.addClass("is-panning");
+    });
+    this.stageEl?.addEventListener("pointermove", (event) => {
+      if (!this.stageEl || !this.isPanning || !this.panStart) {
+        return;
+      }
+      event.preventDefault();
+      this.stageEl.scrollLeft = this.panStart.scrollLeft - (event.clientX - this.panStart.x);
+      this.stageEl.scrollTop = this.panStart.scrollTop - (event.clientY - this.panStart.y);
+    });
+    this.stageEl?.addEventListener("pointerup", (event) => this.stopPanning(event));
+    this.stageEl?.addEventListener("pointercancel", (event) => this.stopPanning(event));
+  }
+
+  private stopPanning(event: PointerEvent): void {
+    if (!this.stageEl || !this.isPanning) {
+      return;
+    }
+    this.isPanning = false;
+    this.panStart = null;
+    try {
+      this.stageEl.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may already be released by the browser.
+    }
+    this.stageEl.removeClass("is-panning");
   }
 
   private syncStyleFromSelection(): void {
@@ -434,12 +519,22 @@ export class AnnotationEditorModal extends Modal {
         this.fontSizeInputEl.value = String(this.style.fontSize);
       }
     }
+    const fontFamily = String(object.get("fontFamily") || "");
+    if (fontFamily && this.fontFamilySelectEl && Array.from(this.fontFamilySelectEl.options).some((option) => option.value === fontFamily)) {
+      this.textFontFamily = fontFamily;
+      this.fontFamilySelectEl.value = fontFamily;
+    }
+    const fontWeight = String(object.get("fontWeight") || "");
+    if (fontWeight) {
+      this.textBold = fontWeight === "700" || fontWeight === "bold";
+      this.boldButtonEl?.toggleClass("is-active", this.textBold);
+    }
   }
 
   private applyStyleToSelection(): void {
     const objects = this.canvas?.getActiveObjects() ?? [];
     for (const object of objects) {
-      applyStyleToObject(object, this.style);
+      applyStyleToObject(object, this.style, this.textFontFamily, this.textBold);
     }
     this.canvas?.requestRenderAll();
   }
@@ -451,9 +546,11 @@ export class AnnotationEditorModal extends Modal {
     const text = new Textbox("Text", {
       left: point.x,
       top: point.y,
+      width: 260,
       fill: this.style.color,
       fontSize: this.style.fontSize,
-      fontFamily: "var(--font-interface, sans-serif)"
+      fontWeight: this.textBold ? "700" : "400",
+      fontFamily: this.textFontFamily
     });
     applySelectionControls(text);
     this.canvas.add(text);
@@ -467,7 +564,7 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return;
     }
-    const radius = Math.max(14, this.style.fontSize * 0.58);
+    const radius = Math.max(24, Math.min(54, this.style.fontSize * 0.62));
     const number = this.settings.nextBadgeNumber;
     const badgeId = `badge-${Date.now()}-${number}`;
     const circle = new Circle({
@@ -476,32 +573,40 @@ export class AnnotationEditorModal extends Modal {
       radius,
       fill: this.style.color,
       stroke: "#ffffff",
-      strokeWidth: Math.max(2, Math.round(this.style.strokeWidth / 3)),
+      strokeWidth: Math.max(3, Math.round(this.style.strokeWidth / 2)),
       skitchKind: "badge",
       skitchBadgeId: badgeId,
       skitchBadgePart: "shape"
     } as Partial<Circle>);
-    const labelSize = radius * 2;
-    const label = new Textbox(String(number), {
-      left: point.x - radius,
-      top: point.y - this.style.fontSize * 0.58,
-      width: labelSize,
-      height: labelSize,
+    const label = new Text(String(number), {
+      left: point.x,
+      top: point.y,
+      originX: "center",
+      originY: "center",
       fill: "#ffffff",
-      fontSize: this.style.fontSize,
+      fontSize: Math.max(16, radius * 0.9),
       fontWeight: "700",
       textAlign: "center",
-      fontFamily: "var(--font-interface, sans-serif)",
+      fontFamily: "Arial, Helvetica, sans-serif",
       selectable: true,
       evented: true,
       skitchKind: "badge",
       skitchBadgeId: badgeId,
       skitchBadgePart: "label"
-    } as Partial<Textbox>);
+    } as Partial<Text>);
+    circle.set({
+      shadow: new Shadow({ color: "rgba(0,0,0,0.35)", blur: 6, offsetX: 0, offsetY: 2 })
+    } as Partial<Circle>);
     circle.on("moving", () => {
       label.set({
-        left: Number(circle.left) + radius - labelSize / 2,
-        top: Number(circle.top) + radius - this.style.fontSize * 0.58
+        left: Number(circle.left) + radius,
+        top: Number(circle.top) + radius
+      });
+    });
+    label.on("moving", () => {
+      circle.set({
+        left: Number(label.left) - radius,
+        top: Number(label.top) - radius
       });
     });
     applySelectionControls(circle);
@@ -711,13 +816,13 @@ function applySelectionControls(object: FabricObject): void {
   } as Partial<FabricObject>);
 }
 
-function applyStyleToObject(object: FabricObject, style: AnnotationStyleState): void {
+function applyStyleToObject(object: FabricObject, style: AnnotationStyleState, textFontFamily: string, textBold: boolean): void {
   const childObjects = typeof (object as { getObjects?: unknown }).getObjects === "function"
     ? ((object as unknown as { getObjects: () => FabricObject[] }).getObjects() ?? []).filter(Boolean)
     : [];
   if (childObjects.length > 0) {
     for (const child of childObjects) {
-      applyStyleToObject(child, style);
+      applyStyleToObject(child, style, textFontFamily, textBold);
     }
     object.dirty = true;
     return;
@@ -726,7 +831,9 @@ function applyStyleToObject(object: FabricObject, style: AnnotationStyleState): 
   if (object.type === "textbox" || object.type === "i-text" || object.type === "text") {
     object.set({
       fill: style.color,
-      fontSize: style.fontSize
+      fontSize: style.fontSize,
+      fontFamily: textFontFamily,
+      fontWeight: textBold ? "700" : "400"
     } as Partial<FabricObject>);
     return;
   }
