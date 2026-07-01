@@ -3,6 +3,7 @@ import { hasAnnotationContent, type AnnotationDocument } from "./annotation-mode
 import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
+import { putFabricJson } from "./fabric-adapter";
 import { attachFabricOverlay, attachOverlay, hasFabricOverlay } from "./render-overlay";
 import { DEFAULT_SETTINGS, SkitchLayerSettingTab, type SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
@@ -270,7 +271,26 @@ export default class SkitchLayerPlugin extends Plugin {
           }
         });
     });
+    menu.addItem((item) => {
+      item
+        .setTitle("Clear annotations")
+        .setIcon("eraser")
+        .onClick(async () => {
+          await this.clearAnnotationFromMenu(wrapper, image, annotation);
+        });
+    });
     menu.showAtMouseEvent(event);
+  }
+
+  private async clearAnnotationFromMenu(wrapper: HTMLElement, image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
+    const cleared = putFabricJson({ ...annotation, objects: [] }, { version: "7.4.0", objects: [] });
+    await this.storage.save(cleared);
+    wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+    if (originalFile instanceof TFile) {
+      image.src = this.app.vault.getResourcePath(originalFile);
+    }
+    new Notice("Annotations cleared");
   }
 
   private findCopyTargetWrapper(event: ClipboardEvent): HTMLElement | null {

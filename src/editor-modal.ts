@@ -25,6 +25,8 @@ import { serializeFabricScene } from "./fabric-serialization";
 import type { SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
+const COLOR_PRESETS = ["#ff2b7a", "#ff8a1f", "#ffd400", "#22c55e", "#38bdf8", "#8b5cf6", "#ffffff", "#111827"];
+
 export class AnnotationEditorModal extends Modal {
   private document: AnnotationDocument | null = null;
   private tool: EditorTool = "arrow";
@@ -185,10 +187,18 @@ export class AnnotationEditorModal extends Modal {
     color.value = this.style.color;
     color.title = "Color";
     color.addEventListener("input", () => {
-      this.style.color = color.value;
-      this.applyStyleToSelection();
+      this.setStyleColor(color.value);
     });
     this.colorInputEl = color;
+
+    const presets = container.createDiv({ cls: "skitch-layer-color-presets" });
+    for (const preset of COLOR_PRESETS) {
+      const swatch = presets.createEl("button", { cls: "skitch-layer-color-swatch" });
+      swatch.type = "button";
+      swatch.title = preset;
+      swatch.style.backgroundColor = preset;
+      swatch.addEventListener("click", () => this.setStyleColor(preset));
+    }
 
     const stroke = container.createEl("input", { cls: "skitch-layer-width-input" });
     stroke.type = "range";
@@ -253,6 +263,18 @@ export class AnnotationEditorModal extends Modal {
     this.toolGroupEl?.querySelectorAll("button").forEach((candidate) => {
       candidate.toggleClass("is-active", candidate.dataset.tool === tool);
     });
+    this.configureTool();
+  }
+
+  private setStyleColor(color: string): void {
+    this.style.color = color;
+    if (this.colorInputEl) {
+      this.colorInputEl.value = color;
+    }
+    this.applyStyleToSelection();
+    if (this.textEditorEl && this.textEditorPoint) {
+      this.applyTextEditorStyle(this.textEditorEl, this.textEditorPoint);
+    }
     this.configureTool();
   }
 
@@ -680,6 +702,7 @@ export class AnnotationEditorModal extends Modal {
       selectable: true,
       evented: true
     } as Partial<Textbox>);
+    refreshTextObjectLayout(text);
     applySelectionControls(text);
     if (!committedEditingObject) {
       this.canvas.add(text);
@@ -995,6 +1018,15 @@ function measureTextBoxWidth(value: string, fontSize: number, fontFamily: string
   const lines = value.split(/\r?\n/);
   const width = Math.max(...lines.map((line) => context.measureText(line || " ").width));
   return Math.max(48, Math.ceil(width + fontSize * 0.6));
+}
+
+function refreshTextObjectLayout(text: Textbox): void {
+  const layoutTarget = text as Textbox & {
+    initDimensions?: () => void;
+  };
+  layoutTarget.initDimensions?.();
+  text.setCoords();
+  text.dirty = true;
 }
 
 function createBadgeSvgDataUrl(label: string, color: string): string {
