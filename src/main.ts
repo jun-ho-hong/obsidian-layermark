@@ -2,6 +2,7 @@
 import { type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
+import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
 import { attachOverlay } from "./render-overlay";
 import { AnnotationStorage } from "./storage";
 
@@ -121,7 +122,7 @@ export default class SkitchLayerPlugin extends Plugin {
       if (file instanceof TFile && this.imageMatchesFile(image, file)) {
         return annotation;
       }
-      if (this.imageLooksLikeAnnotationTarget(image, annotation)) {
+      if (imageLooksLikeAnnotationTarget(image, annotation)) {
         return annotation;
       }
     }
@@ -155,7 +156,7 @@ export default class SkitchLayerPlugin extends Plugin {
         this.applyAnnotationToImage(image, annotation);
         continue;
       }
-      if (this.imageLooksLikeAnnotationTarget(image, annotation)) {
+      if (imageLooksLikeAnnotationTarget(image, annotation)) {
         this.applyAnnotationToImage(image, annotation);
       }
     }
@@ -286,21 +287,12 @@ export default class SkitchLayerPlugin extends Plugin {
     if (!this.isSupportedImage(file)) {
       return false;
     }
-    const resourcePath = this.normalizeUrlForCompare(this.app.vault.getResourcePath(file));
-    const imageSource = this.normalizeUrlForCompare(image.src);
+    const resourcePath = normalizeComparableUrl(this.app.vault.getResourcePath(file));
+    const imageSource = normalizeComparableUrl(image.src);
     if (imageSource === resourcePath || imageSource.startsWith(`${resourcePath}?`) || imageSource.startsWith(`${resourcePath}#`)) {
       return true;
     }
     return imageSource.includes(encodeURI(file.path)) || imageSource.includes(file.path) || image.alt === file.basename || image.alt === file.path;
-  }
-
-  private imageLooksLikeAnnotationTarget(image: HTMLImageElement, annotation: AnnotationDocument): boolean {
-    const filename = annotation.imagePath.split("/").pop() ?? annotation.imagePath;
-    const decodedSource = this.normalizeUrlForCompare(image.src);
-    if (image.alt === filename || image.alt === annotation.imagePath || decodedSource.includes(filename) || decodedSource.includes(annotation.imagePath)) {
-      return true;
-    }
-    return image.naturalWidth === annotation.imageSize.width && image.naturalHeight === annotation.imageSize.height;
   }
 
   private findImageFileByResourceSrc(src: string): TFile | null {
@@ -313,14 +305,6 @@ export default class SkitchLayerPlugin extends Plugin {
       }
     }
     return null;
-  }
-
-  private normalizeUrlForCompare(value: string): string {
-    try {
-      return decodeURI(value);
-    } catch {
-      return value;
-    }
   }
 
   private isSupportedImage(file: TFile): boolean {
