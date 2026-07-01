@@ -3,9 +3,7 @@ import { hasAnnotationContent, type AnnotationDocument } from "./annotation-mode
 import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
-import { getPreviewImagePath } from "./preview-paths";
-import { getImageRenderDecision } from "./render-policy";
-import { attachOverlay } from "./render-overlay";
+import { attachFabricOverlay, attachOverlay, hasFabricOverlay } from "./render-overlay";
 import { DEFAULT_SETTINGS, SkitchLayerSettingTab, type SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
@@ -195,13 +193,14 @@ export default class SkitchLayerPlugin extends Plugin {
     }
 
     wrapper.dataset.skitchImagePath = annotation.imagePath;
-    wrapper.querySelectorAll(":scope > .skitch-layer-overlay").forEach((overlay) => overlay.remove());
-    const previewPath = getPreviewImagePath(annotation.imagePath);
-    const previewFile = this.app.vault.getAbstractFileByPath(previewPath);
-    const decision = getImageRenderDecision(annotation.imagePath, annotation, previewFile instanceof TFile);
-    if (decision.mode === "preview" && previewFile instanceof TFile) {
+    wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+    if (originalFile instanceof TFile) {
       image.dataset.skitchOriginalPath = annotation.imagePath;
-      image.src = this.app.vault.getResourcePath(previewFile);
+      image.src = this.app.vault.getResourcePath(originalFile);
+    }
+    if (hasFabricOverlay(annotation)) {
+      await attachFabricOverlay(wrapper, annotation);
       return;
     }
     attachOverlay(wrapper, annotation);

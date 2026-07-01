@@ -1,4 +1,4 @@
-import { Canvas, Circle, Ellipse, Path, PencilBrush, Polyline, Rect, Shadow, Text, Textbox, type FabricObject } from "fabric";
+import { Canvas, Circle, Ellipse, Group, Path, PencilBrush, Polyline, Rect, Shadow, Text, Textbox, type FabricObject } from "fabric";
 import { Modal, Notice, setIcon, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
@@ -332,7 +332,7 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return;
     }
-    this.canvas.isDrawingMode = this.tool === "pen";
+    this.canvas.isDrawingMode = this.tool === "pen" || this.tool === "highlight";
     this.canvas.selection = this.tool === "select";
     this.canvas.defaultCursor = this.tool === "select" ? "default" : "crosshair";
     this.canvas.getObjects().forEach((object) => {
@@ -341,12 +341,12 @@ export class AnnotationEditorModal extends Modal {
       applySelectionControls(object);
     });
     if (this.canvas.freeDrawingBrush) {
-      this.canvas.freeDrawingBrush.color = this.style.color;
-      this.canvas.freeDrawingBrush.width = this.style.strokeWidth;
+      this.canvas.freeDrawingBrush.color = this.tool === "highlight" ? colorWithAlpha(this.style.color, 0.34) : this.style.color;
+      this.canvas.freeDrawingBrush.width = this.tool === "highlight" ? Math.max(12, this.style.strokeWidth * 2.5) : this.style.strokeWidth;
     } else {
       this.canvas.freeDrawingBrush = new PencilBrush(this.canvas);
-      this.canvas.freeDrawingBrush.color = this.style.color;
-      this.canvas.freeDrawingBrush.width = this.style.strokeWidth;
+      this.canvas.freeDrawingBrush.color = this.tool === "highlight" ? colorWithAlpha(this.style.color, 0.34) : this.style.color;
+      this.canvas.freeDrawingBrush.width = this.tool === "highlight" ? Math.max(12, this.style.strokeWidth * 2.5) : this.style.strokeWidth;
     }
     this.canvas.renderAll();
   }
@@ -357,6 +357,22 @@ export class AnnotationEditorModal extends Modal {
     }
     this.canvas.on("selection:created", () => this.syncStyleFromSelection());
     this.canvas.on("selection:updated", () => this.syncStyleFromSelection());
+    this.canvas.on("path:created", (event) => {
+      const path = event.path;
+      if (!path) {
+        return;
+      }
+      if (this.tool === "highlight") {
+        path.set({
+          skitchKind: "highlight",
+          stroke: colorWithAlpha(this.style.color, 0.34),
+          strokeWidth: Math.max(12, this.style.strokeWidth * 2.5),
+          strokeLineCap: "round",
+          strokeLineJoin: "round"
+        } as Partial<FabricObject>);
+      }
+      applySelectionControls(path);
+    });
     this.canvas.on("mouse:dblclick", (event) => {
       const target = event.target;
       if (target && (target.type === "textbox" || target.type === "i-text" || target.type === "text")) {
@@ -366,7 +382,7 @@ export class AnnotationEditorModal extends Modal {
       }
     });
     this.canvas.on("mouse:down", (event) => {
-      if (!this.canvas || this.tool === "select" || this.tool === "pen") {
+      if (!this.canvas || this.tool === "select" || this.tool === "pen" || this.tool === "highlight") {
         return;
       }
       const pointer = this.canvas.getScenePoint(event.e);
@@ -403,6 +419,9 @@ export class AnnotationEditorModal extends Modal {
 
   private wireKeyboardShortcuts(): void {
     this.scope.register([], "Delete", () => {
+      if (this.isTypingText()) {
+        return true;
+      }
       this.deleteSelection();
       return false;
     });
@@ -410,17 +429,11 @@ export class AnnotationEditorModal extends Modal {
       this.saveAndClose().catch((error) => this.showSaveError(error));
       return false;
     });
-    for (const key of ["v", "s", "p", "t", "h", "r", "e", "a", "b"]) {
-      this.scope.register([], key, () => {
-        const tool = toolFromShortcut(key);
-        if (tool) {
-          this.setTool(tool);
-        }
-        return false;
-      });
-    }
     for (const key of ["1", "2", "3", "4", "5", "6", "7", "8"]) {
       this.scope.register([], key, () => {
+        if (this.isTypingText()) {
+          return true;
+        }
         const tool = toolFromShortcut(key);
         if (tool) {
           this.setTool(tool);
@@ -429,17 +442,35 @@ export class AnnotationEditorModal extends Modal {
       });
     }
     this.scope.register([], "-", () => {
+      if (this.isTypingText()) {
+        return true;
+      }
       this.setZoom(this.zoom / 1.2);
       return false;
     });
     this.scope.register([], "=", () => {
+      if (this.isTypingText()) {
+        return true;
+      }
       this.setZoom(this.zoom * 1.2);
       return false;
     });
     this.scope.register([], "0", () => {
+      if (this.isTypingText()) {
+        return true;
+      }
       this.fitToStage();
       return false;
     });
+  }
+
+  private isTypingText(): boolean {
+    const activeObject = this.canvas?.getActiveObject();
+    if (activeObject && (activeObject.type === "textbox" || activeObject.type === "i-text" || activeObject.type === "text")) {
+      return Boolean((activeObject as Textbox).isEditing);
+    }
+    const activeElement = document.activeElement;
+    return activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLSelectElement;
   }
 
   private wireWheelZoom(): void {
@@ -564,27 +595,27 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return;
     }
-    const radius = Math.max(24, Math.min(54, this.style.fontSize * 0.62));
+    const radius = Math.max(22, Math.min(42, this.style.fontSize * 0.52));
     const number = this.settings.nextBadgeNumber;
     const badgeId = `badge-${Date.now()}-${number}`;
     const circle = new Circle({
-      left: point.x - radius,
-      top: point.y - radius,
+      left: -radius,
+      top: -radius,
       radius,
       fill: this.style.color,
       stroke: "#ffffff",
-      strokeWidth: Math.max(3, Math.round(this.style.strokeWidth / 2)),
+      strokeWidth: Math.max(4, Math.round(this.style.strokeWidth / 2)),
       skitchKind: "badge",
       skitchBadgeId: badgeId,
       skitchBadgePart: "shape"
     } as Partial<Circle>);
     const label = new Text(String(number), {
-      left: point.x,
-      top: point.y,
+      left: 0,
+      top: 1,
       originX: "center",
       originY: "center",
       fill: "#ffffff",
-      fontSize: Math.max(16, radius * 0.9),
+      fontSize: Math.max(16, radius * 0.72),
       fontWeight: "700",
       textAlign: "center",
       fontFamily: "Arial, Helvetica, sans-serif",
@@ -597,23 +628,17 @@ export class AnnotationEditorModal extends Modal {
     circle.set({
       shadow: new Shadow({ color: "rgba(0,0,0,0.35)", blur: 6, offsetX: 0, offsetY: 2 })
     } as Partial<Circle>);
-    circle.on("moving", () => {
-      label.set({
-        left: Number(circle.left) + radius,
-        top: Number(circle.top) + radius
-      });
-    });
-    label.on("moving", () => {
-      circle.set({
-        left: Number(label.left) - radius,
-        top: Number(label.top) - radius
-      });
-    });
-    applySelectionControls(circle);
-    applySelectionControls(label);
-    this.canvas.add(circle);
-    this.canvas.add(label);
-    this.canvas.setActiveObject(circle);
+    const badge = new Group([circle, label], {
+      left: point.x,
+      top: point.y,
+      originX: "center",
+      originY: "center",
+      skitchKind: "badge",
+      skitchBadgeId: badgeId
+    } as Partial<Group>);
+    applySelectionControls(badge);
+    this.canvas.add(badge);
+    this.canvas.setActiveObject(badge);
     this.settings.nextBadgeNumber = nextBadgeNumber(number);
     this.setTool("select");
     this.configureTool();
@@ -641,20 +666,10 @@ export class AnnotationEditorModal extends Modal {
         height: Math.abs(height),
         stroke: this.style.color,
         strokeWidth: this.style.strokeWidth,
-        fill: "transparent"
+        fill: "transparent",
+        originX: "left",
+        originY: "top"
       }));
-    }
-    if (this.tool === "highlight") {
-      return withControls(new Rect({
-        left: Math.min(startPoint.x, endPoint.x),
-        top: Math.min(startPoint.y, endPoint.y),
-        width: Math.abs(width),
-        height: Math.abs(height),
-        stroke: "rgba(0,0,0,0)",
-        strokeWidth: 0,
-        fill: colorWithAlpha(this.style.color, 0.32),
-        skitchKind: "highlight"
-      } as Partial<Rect>));
     }
     if (this.tool === "ellipse") {
       return withControls(new Ellipse({
@@ -664,7 +679,9 @@ export class AnnotationEditorModal extends Modal {
         ry: Math.abs(height) / 2,
         stroke: this.style.color,
         strokeWidth: this.style.strokeWidth,
-        fill: "transparent"
+        fill: "transparent",
+        originX: "left",
+        originY: "top"
       }));
     }
     return null;

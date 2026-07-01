@@ -1,4 +1,12 @@
-﻿import { annotationToSvgGeometry, type AnnotationDocument, type AnnotationObject, type Point } from "./annotation-model";
+import { StaticCanvas } from "fabric";
+import { annotationToSvgGeometry, type AnnotationDocument, type AnnotationObject, type Point } from "./annotation-model";
+import { getFabricJson } from "./fabric-adapter";
+import { stripSkitchBackgroundObjects } from "./fabric-preview";
+
+type FabricJson = {
+  objects?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
 
 export function createOverlaySvgMarkup(document: AnnotationDocument): string {
   const body = document.objects.map((annotation) => renderAnnotation(annotation, document.imageSize)).join("");
@@ -14,6 +22,33 @@ export function attachOverlay(container: HTMLElement, document: AnnotationDocume
   }
   container.appendChild(overlay);
   return overlay;
+}
+
+export function hasFabricOverlay(document: AnnotationDocument): boolean {
+  const fabricJson = stripSkitchBackgroundObjects(getFabricJson(document));
+  return isFabricJson(fabricJson) && Boolean(fabricJson.objects?.length);
+}
+
+export async function attachFabricOverlay(container: HTMLElement, document: AnnotationDocument): Promise<HTMLCanvasElement> {
+  const fabricJson = stripSkitchBackgroundObjects(getFabricJson(document));
+  if (!isFabricJson(fabricJson)) {
+    throw new Error("Unable to render Fabric annotation overlay.");
+  }
+
+  const canvasElement = container.ownerDocument.createElement("canvas");
+  canvasElement.addClass("skitch-layer-fabric-overlay");
+  canvasElement.width = document.imageSize.width;
+  canvasElement.height = document.imageSize.height;
+  container.appendChild(canvasElement);
+
+  const canvas = new StaticCanvas(canvasElement, {
+    width: document.imageSize.width,
+    height: document.imageSize.height,
+    enableRetinaScaling: false
+  });
+  await canvas.loadFromJSON(fabricJson);
+  canvas.renderAll();
+  return canvasElement;
 }
 
 function renderAnnotation(annotation: AnnotationObject, imageSize: AnnotationDocument["imageSize"]): string {
@@ -46,4 +81,8 @@ function escapeAttribute(value: string): string {
 
 function escapeText(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function isFabricJson(value: unknown): value is FabricJson {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
