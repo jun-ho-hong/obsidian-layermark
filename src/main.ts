@@ -1,4 +1,5 @@
-﻿import { Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
 import { attachOverlay } from "./render-overlay";
 import { AnnotationStorage } from "./storage";
@@ -52,7 +53,9 @@ export default class SkitchLayerPlugin extends Plugin {
   }
 
   private openEditor(file: TFile): void {
-    new AnnotationEditorModal(this.app, file, this.storage).open();
+    new AnnotationEditorModal(this.app, file, this.storage, async (document) => {
+      await this.refreshVisibleAnnotations(document);
+    }).open();
   }
 
   private async processImages(element: HTMLElement, context: MarkdownPostProcessorContext): Promise<void> {
@@ -66,19 +69,48 @@ export default class SkitchLayerPlugin extends Plugin {
       if (!annotation || annotation.objects.length === 0) {
         continue;
       }
-      if (image.parentElement?.hasClass("skitch-layer-wrapper")) {
-        continue;
-      }
-      const wrapper = image.ownerDocument.createElement("span");
-      wrapper.addClass("skitch-layer-wrapper");
-      image.parentElement?.insertBefore(wrapper, image);
-      wrapper.appendChild(image);
-      attachOverlay(wrapper, annotation);
+      this.applyAnnotationToImage(image, annotation);
     }
   }
 
+  private async refreshVisibleAnnotations(annotation: AnnotationDocument): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+    if (!(file instanceof TFile)) {
+      return;
+    }
+
+    const images = Array.from(document.querySelectorAll<HTMLImageElement>(".workspace-leaf-content img"));
+    for (const image of images) {
+      if (this.imageMatchesFile(image, file)) {
+        this.applyAnnotationToImage(image, annotation);
+      }
+    }
+  }
+
+  private applyAnnotationToImage(image: HTMLImageElement, annotation: AnnotationDocument): void {
+    const parent = image.parentElement;
+    if (!parent) {
+      return;
+    }
+
+    const wrapper = parent.hasClass("skitch-layer-wrapper") ? parent : image.ownerDocument.createElement("span");
+    if (!parent.hasClass("skitch-layer-wrapper")) {
+      wrapper.addClass("skitch-layer-wrapper");
+      parent.insertBefore(wrapper, image);
+      wrapper.appendChild(image);
+    }
+
+    wrapper.querySelectorAll(":scope > .skitch-layer-overlay").forEach((overlay) => overlay.remove());
+    attachOverlay(wrapper, annotation);
+  }
+
   private resolveImageFile(image: HTMLImageElement, sourcePath: string): TFile | null {
-    const linkText = image.getAttribute("alt") || image.getAttribute("data-path") || "";
+    const directFromSource = this.findImageFileByResourceSrc(image.src);
+    if (directFromSource) {
+      return directFromSource;
+    }
+
+    const linkText = image.getAttribute("data-path") || image.getAttribute("alt") || "";
     const candidates = [linkText, decodeURIComponent(linkText)].filter(Boolean);
     for (const candidate of candidates) {
       const linked = this.app.metadataCache.getFirstLinkpathDest(candidate, sourcePath);
@@ -91,6 +123,38 @@ export default class SkitchLayerPlugin extends Plugin {
       }
     }
     return null;
+  }
+
+  private imageMatchesFile(image: HTMLImageElement, file: TFile): boolean {
+    if (!this.isSupportedImage(file)) {
+      return false;
+    }
+    const resourcePath = this.normalizeUrlForCompare(this.app.vault.getResourcePath(file));
+    const imageSource = this.normalizeUrlForCompare(image.src);
+    if (imageSource === resourcePath || imageSource.startsWith(`${resourcePath}?`) || imageSource.startsWith(`${resourcePath}#`)) {
+      return true;
+    }
+    return imageSource.includes(encodeURI(file.path)) || imageSource.includes(file.path) || image.alt === file.basename || image.alt === file.path;
+  }
+
+  private findImageFileByResourceSrc(src: string): TFile | null {
+    if (!src) {
+      return null;
+    }
+    for (const file of this.app.vault.getFiles()) {
+      if (this.imageMatchesFile({ src, alt: "" } as HTMLImageElement, file)) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  private normalizeUrlForCompare(value: string): string {
+    try {
+      return decodeURI(value);
+    } catch {
+      return value;
+    }
   }
 
   private isSupportedImage(file: TFile): boolean {

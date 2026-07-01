@@ -1,4 +1,4 @@
-﻿import { Modal, Notice, Setting, TFile, type App } from "obsidian";
+import { Modal, Notice, Setting, TFile, type App } from "obsidian";
 import { normalizePoint, type AnnotationDocument, type AnnotationObject, type ImageSize, type Point } from "./annotation-model";
 import { AnnotationStorage } from "./storage";
 import { createOverlaySvgMarkup } from "./render-overlay";
@@ -17,7 +17,8 @@ export class AnnotationEditorModal extends Modal {
   constructor(
     app: App,
     private readonly imageFile: TFile,
-    private readonly storage: AnnotationStorage
+    private readonly storage: AnnotationStorage,
+    private readonly onSave?: (document: AnnotationDocument) => void | Promise<void>
   ) {
     super(app);
   }
@@ -198,6 +199,7 @@ export class AnnotationEditorModal extends Modal {
       return;
     }
     await this.storage.save(this.document);
+    await this.onSave?.(this.document);
     new Notice("Annotation saved");
     this.close();
   }
