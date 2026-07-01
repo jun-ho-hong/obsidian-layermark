@@ -14,6 +14,7 @@ import {
   DEFAULT_STYLE,
   createArrowPathData,
   nextBadgeNumber,
+  normalizeBadgeNumber,
   normalizeFontSize,
   normalizeStrokeWidth,
   toolFromShortcut,
@@ -41,6 +42,8 @@ export class AnnotationEditorModal extends Modal {
   private fontSizeInputEl: HTMLInputElement | null = null;
   private fontFamilySelectEl: HTMLSelectElement | null = null;
   private boldButtonEl: HTMLButtonElement | null = null;
+  private badgeNumberControlEl: HTMLElement | null = null;
+  private badgeNumberInputEl: HTMLInputElement | null = null;
   private textEditorEl: HTMLTextAreaElement | null = null;
   private textEditorPoint: Point | null = null;
   private textEditorObject: Textbox | null = null;
@@ -80,15 +83,16 @@ export class AnnotationEditorModal extends Modal {
     toolbar.createDiv({ cls: "skitch-layer-toolbar-title", text: this.imageFile.name });
     const palette = toolbar.createDiv({ cls: "skitch-layer-tool-palette" });
     this.toolGroupEl = palette.createDiv({ cls: "skitch-layer-tool-group" });
-    this.addToolButton(this.toolGroupEl, "select", "선택", "mouse-pointer-2", "1");
-    this.addToolButton(this.toolGroupEl, "pen", "펜", "pen-line", "2");
-    this.addToolButton(this.toolGroupEl, "text", "텍스트", "type", "3");
-    this.addToolButton(this.toolGroupEl, "highlight", "강조표시", "highlighter", "4");
-    this.addToolButton(this.toolGroupEl, "rectangle", "사각형", "square", "5");
-    this.addToolButton(this.toolGroupEl, "ellipse", "원", "circle", "6");
-    this.addToolButton(this.toolGroupEl, "arrow", "화살표", "arrow-up-right", "7");
-    this.addToolButton(this.toolGroupEl, "badge", "배지", "badge-check", "8");
+    this.addToolButton(this.toolGroupEl, "select", "\uc120\ud0dd", "mouse-pointer-2", "1");
+    this.addToolButton(this.toolGroupEl, "pen", "\ud39c", "pen-line", "2");
+    this.addToolButton(this.toolGroupEl, "text", "\ud14d\uc2a4\ud2b8", "type", "3");
+    this.addToolButton(this.toolGroupEl, "highlight", "\uac15\uc870\ud45c\uc2dc", "highlighter", "4");
+    this.addToolButton(this.toolGroupEl, "rectangle", "\uc0ac\uac01\ud615", "square", "5");
+    this.addToolButton(this.toolGroupEl, "ellipse", "\uc6d0", "circle", "6");
+    this.addToolButton(this.toolGroupEl, "arrow", "\ud654\uc0b4\ud45c", "arrow-up-right", "7");
+    this.addToolButton(this.toolGroupEl, "badge", "\ubc30\uc9c0", "badge-check", "8");
     this.addStyleControls(palette.createDiv({ cls: "skitch-layer-style-controls" }));
+    this.addBadgeNumberControls(palette.createDiv({ cls: "skitch-layer-badge-number-controls" }));
     const actions = new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }));
     actions.addButton((button) => {
       button.setButtonText("Delete").onClick(() => this.deleteSelection());
@@ -158,6 +162,8 @@ export class AnnotationEditorModal extends Modal {
     this.fontSizeInputEl = null;
     this.fontFamilySelectEl = null;
     this.boldButtonEl = null;
+    this.badgeNumberControlEl = null;
+    this.badgeNumberInputEl = null;
     this.textEditorEl?.remove();
     this.textEditorEl = null;
     this.textEditorPoint = null;
@@ -232,7 +238,7 @@ export class AnnotationEditorModal extends Modal {
     const fontFamily = container.createEl("select", { cls: "skitch-layer-font-family-input" });
     fontFamily.title = "Text font";
     for (const [label, value] of [
-      ["기본", "var(--font-interface, sans-serif)"],
+      ["\uae30\ubcf8", "var(--font-interface, sans-serif)"],
       ["Sans", "Arial, Helvetica, sans-serif"],
       ["Serif", "Georgia, serif"],
       ["Mono", "Consolas, monospace"]
@@ -258,11 +264,53 @@ export class AnnotationEditorModal extends Modal {
     this.boldButtonEl = bold;
   }
 
+  private addBadgeNumberControls(container: HTMLElement): void {
+    this.badgeNumberControlEl = container;
+    container.createSpan({ cls: "skitch-layer-badge-number-label", text: "\ubc30\uc9c0" });
+
+    const decrease = container.createEl("button", { cls: "skitch-layer-badge-number-button", text: "-" });
+    decrease.type = "button";
+    decrease.title = "Previous badge number";
+    decrease.addEventListener("click", () => this.setNextBadgeNumber(this.settings.nextBadgeNumber - 1));
+
+    const input = container.createEl("input", { cls: "skitch-layer-badge-number-input" });
+    input.type = "number";
+    input.min = "1";
+    input.step = "1";
+    input.title = "Next badge number";
+    input.addEventListener("change", () => this.setNextBadgeNumber(Number(input.value)));
+    this.badgeNumberInputEl = input;
+
+    const increase = container.createEl("button", { cls: "skitch-layer-badge-number-button", text: "+" });
+    increase.type = "button";
+    increase.title = "Next badge number";
+    increase.addEventListener("click", () => this.setNextBadgeNumber(this.settings.nextBadgeNumber + 1));
+
+    const restart = container.createEl("button", { cls: "skitch-layer-badge-number-reset", text: "1" });
+    restart.type = "button";
+    restart.title = "Restart badges at 1";
+    restart.addEventListener("click", () => this.setNextBadgeNumber(1));
+
+    this.syncBadgeNumberControl();
+  }
+
+  private setNextBadgeNumber(value: number): void {
+    this.settings.nextBadgeNumber = normalizeBadgeNumber(value);
+    this.syncBadgeNumberControl();
+  }
+
+  private syncBadgeNumberControl(): void {
+    if (this.badgeNumberInputEl) {
+      this.badgeNumberInputEl.value = String(normalizeBadgeNumber(this.settings.nextBadgeNumber));
+    }
+    this.badgeNumberControlEl?.toggleClass("is-visible", this.tool === "badge");
+  }
   private setTool(tool: EditorTool): void {
     this.tool = tool;
     this.toolGroupEl?.querySelectorAll("button").forEach((candidate) => {
       candidate.toggleClass("is-active", candidate.dataset.tool === tool);
     });
+    this.syncBadgeNumberControl();
     this.configureTool();
   }
 
@@ -614,7 +662,7 @@ export class AnnotationEditorModal extends Modal {
     this.textEditorObject = editingObject ?? null;
     const editor = this.frameEl.createEl("textarea", { cls: "skitch-layer-text-editor" });
     editor.value = initialText;
-    editor.placeholder = "텍스트 입력";
+    editor.placeholder = "\ud14d\uc2a4\ud2b8 \uc785\ub825";
     this.applyTextEditorStyle(editor, point);
     editor.addEventListener("keydown", (event) => {
       event.stopPropagation();
@@ -754,6 +802,7 @@ export class AnnotationEditorModal extends Modal {
     };
     image.src = source;
     this.settings.nextBadgeNumber = nextBadgeNumber(number);
+    this.syncBadgeNumberControl();
     this.setTool("select");
     this.configureTool();
   }
@@ -1053,21 +1102,21 @@ function escapeSvgText(value: string): string {
 function toolLabel(tool: EditorTool): string {
   switch (tool) {
     case "select":
-      return "선택";
+      return "\uc120\ud0dd";
     case "pen":
-      return "펜";
+      return "\ud39c";
     case "text":
-      return "텍스트";
+      return "\ud14d\uc2a4\ud2b8";
     case "highlight":
-      return "강조표시";
+      return "\uac15\uc870\ud45c\uc2dc";
     case "rectangle":
-      return "사각형";
+      return "\uc0ac\uac01\ud615";
     case "ellipse":
-      return "원";
+      return "\uc6d0";
     case "arrow":
-      return "화살표";
+      return "\ud654\uc0b4\ud45c";
     case "badge":
-      return "배지";
+      return "\ubc30\uc9c0";
   }
 }
 

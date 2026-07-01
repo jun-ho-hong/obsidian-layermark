@@ -1,4 +1,4 @@
-﻿.skitch-layer-wrapper {
+.skitch-layer-wrapper {
   display: inline-block;
   position: relative;
   max-width: 100%;
@@ -181,6 +181,41 @@
   color: var(--text-on-accent);
 }
 
+
+.skitch-layer-badge-number-controls {
+  display: none;
+  gap: 4px;
+  align-items: center;
+  padding-left: 8px;
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+.skitch-layer-badge-number-controls.is-visible {
+  display: flex;
+}
+
+.skitch-layer-badge-number-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.skitch-layer-badge-number-input {
+  width: 54px;
+  height: 30px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.skitch-layer-badge-number-button,
+.skitch-layer-badge-number-reset {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
 .skitch-layer-actions {
   min-width: max-content;
   margin-left: 0;

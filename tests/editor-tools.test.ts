@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createArrowPathData, nextBadgeNumber, normalizeFontSize, normalizeStrokeWidth, toolFromShortcut } from "../src/editor-tools";
+import { createArrowPathData, nextBadgeNumber, normalizeBadgeNumber, normalizeFontSize, normalizeStrokeWidth, toolFromShortcut } from "../src/editor-tools";
 
 describe("editor tools", () => {
   it("maps keyboard shortcuts to tools", () => {
@@ -26,6 +26,12 @@ describe("editor tools", () => {
     expect(nextBadgeNumber(0)).toBe(2);
   });
 
+  it("normalizes user-selected badge numbers", () => {
+    expect(normalizeBadgeNumber(9)).toBe(9);
+    expect(normalizeBadgeNumber(1.8)).toBe(1);
+    expect(normalizeBadgeNumber(0)).toBe(1);
+    expect(normalizeBadgeNumber(Number.NaN)).toBe(1);
+  });
   it("normalizes editable style values", () => {
     expect(normalizeStrokeWidth(0)).toBe(1);
     expect(normalizeStrokeWidth(99)).toBe(32);

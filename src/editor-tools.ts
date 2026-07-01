@@ -27,8 +27,12 @@ export function toolFromShortcut(key: string): EditorTool | null {
   return TOOL_SHORTCUTS[key.toLowerCase()] ?? null;
 }
 
+export function normalizeBadgeNumber(value: number): number {
+  return Math.max(1, Math.floor(Number.isFinite(value) ? value : 1));
+}
+
 export function nextBadgeNumber(current: number): number {
-  return Math.max(1, Math.floor(current)) + 1;
+  return normalizeBadgeNumber(current) + 1;
 }
 
 export function normalizeStrokeWidth(value: number): number {
