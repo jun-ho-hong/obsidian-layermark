@@ -31,14 +31,17 @@ export async function createFabricPreviewPngBlob(document: AnnotationDocument, i
 
   const fabricJson = stripSkitchBackgroundObjects(getFabricJson(document));
   if (isFabricJson(fabricJson) && fabricJson.objects && fabricJson.objects.length > 0) {
-    const overlayCanvas = await renderFabricOverlay(fabricJson, document.imageSize);
-    context.drawImage(overlayCanvas, 0, 0);
+    await drawFabricOverlay(context, fabricJson, document.imageSize);
   }
 
   return canvasToPngBlob(baseCanvas);
 }
 
-async function renderFabricOverlay(fabricJson: FabricJson, imageSize: ImageSize): Promise<HTMLCanvasElement> {
+async function drawFabricOverlay(
+  context: CanvasRenderingContext2D,
+  fabricJson: FabricJson,
+  imageSize: ImageSize
+): Promise<void> {
   const canvasElement = window.document.createElement("canvas");
   canvasElement.width = imageSize.width;
   canvasElement.height = imageSize.height;
@@ -51,7 +54,7 @@ async function renderFabricOverlay(fabricJson: FabricJson, imageSize: ImageSize)
     await canvas.loadFromJSON(fabricJson);
     canvas.setDimensions({ width: imageSize.width, height: imageSize.height });
     canvas.renderAll();
-    return canvasElement;
+    context.drawImage(canvasElement, 0, 0);
   } finally {
     canvas.dispose();
   }
