@@ -263,7 +263,7 @@
   caret-color: currentColor;
   line-height: 1.2;
   overflow: hidden;
-  resize: both;
+  resize: none;
   white-space: pre-wrap;
 }
 

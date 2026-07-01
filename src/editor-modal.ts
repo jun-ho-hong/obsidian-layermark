@@ -1,4 +1,4 @@
-import { Canvas, Circle, Ellipse, Group, Path, PencilBrush, Polyline, Rect, Shadow, Text, Textbox, type FabricObject } from "fabric";
+import { Canvas, Ellipse, FabricImage, Path, PencilBrush, Polyline, Rect, Textbox, type FabricObject } from "fabric";
 import { Modal, Notice, setIcon, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
@@ -601,7 +601,7 @@ export class AnnotationEditorModal extends Modal {
         editingObject?.set({ visible: true } as Partial<Textbox>);
         this.cancelTextEditor();
       }
-      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
         event.preventDefault();
         this.commitTextEditor(editingObject);
       }
@@ -649,7 +649,7 @@ export class AnnotationEditorModal extends Modal {
       return;
     }
     const value = this.textEditorEl.value.trim();
-    const width = Math.max(80, this.textEditorEl.offsetWidth / Math.max(this.zoom, 0.01));
+    const width = measureTextBoxWidth(value, this.style.fontSize, this.textFontFamily, this.textBold);
     const point = this.textEditorPoint;
     const committedEditingObject = this.textEditorObject ?? editingObject;
     this.textEditorEl.remove();
@@ -703,53 +703,33 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return;
     }
-    const radius = Math.max(32, Math.min(72, this.style.fontSize * 0.82));
+    const size = Math.max(64, Math.min(132, this.style.fontSize * 1.55));
     const number = this.settings.nextBadgeNumber;
     const badgeId = `badge-${Date.now()}-${number}`;
-    const circle = new Circle({
-      left: -radius,
-      top: -radius,
-      radius,
-      fill: "transparent",
-      stroke: this.style.color,
-      strokeLineCap: "round",
-      strokeLineJoin: "round",
-      strokeWidth: Math.max(7, Math.round(this.style.strokeWidth * 0.9)),
-      skitchKind: "badge",
-      skitchBadgeId: badgeId,
-      skitchBadgePart: "shape"
-    } as Partial<Circle>);
-    const label = new Text(String(number), {
-      left: 0,
-      top: 1,
-      originX: "center",
-      originY: "center",
-      fill: this.style.color,
-      stroke: this.style.color,
-      strokeWidth: Math.max(1, Math.round(this.style.strokeWidth * 0.14)),
-      strokeLineCap: "round",
-      strokeLineJoin: "round",
-      fontSize: Math.max(34, radius * 1.3),
-      fontWeight: "800",
-      textAlign: "center",
-      fontFamily: "\"Segoe Print\", \"Comic Sans MS\", \"Arial Rounded MT Bold\", sans-serif",
-      selectable: true,
-      evented: true,
-      skitchKind: "badge",
-      skitchBadgeId: badgeId,
-      skitchBadgePart: "label"
-    } as Partial<Text>);
-    const badge = new Group([circle, label], {
-      left: point.x,
-      top: point.y,
-      originX: "center",
-      originY: "center",
-      skitchKind: "badge",
-      skitchBadgeId: badgeId
-    } as Partial<Group>);
-    applySelectionControls(badge);
-    this.canvas.add(badge);
-    this.canvas.setActiveObject(badge);
+    const source = createBadgeSvgDataUrl(String(number), this.style.color);
+    const image = new Image();
+    image.onload = () => {
+      if (!this.canvas) {
+        return;
+      }
+      const badge = new FabricImage(image, {
+        left: point.x,
+        top: point.y,
+        originX: "center",
+        originY: "center",
+        scaleX: size / 160,
+        scaleY: size / 160,
+        selectable: true,
+        evented: true,
+        skitchKind: "badge",
+        skitchBadgeId: badgeId
+      } as Partial<FabricImage>);
+      applySelectionControls(badge);
+      this.canvas.add(badge);
+      this.canvas.setActiveObject(badge);
+      this.canvas.requestRenderAll();
+    };
+    image.src = source;
     this.settings.nextBadgeNumber = nextBadgeNumber(number);
     this.setTool("select");
     this.configureTool();
@@ -1002,6 +982,40 @@ function sanitizeCanvasObjects(canvas: Canvas): void {
       canvas.remove(object);
     }
   }
+}
+
+function measureTextBoxWidth(value: string, fontSize: number, fontFamily: string, textBold: boolean): number {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const fallbackWidth = Math.max(48, value.length * fontSize * 0.75);
+  if (!context) {
+    return fallbackWidth;
+  }
+  context.font = `${textBold ? "700" : "400"} ${fontSize}px ${fontFamily}`;
+  const lines = value.split(/\r?\n/);
+  const width = Math.max(...lines.map((line) => context.measureText(line || " ").width));
+  return Math.max(48, Math.ceil(width + fontSize * 0.6));
+}
+
+function createBadgeSvgDataUrl(label: string, color: string): string {
+  const safeColor = escapeSvgAttribute(color);
+  const safeLabel = escapeSvgText(label);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.35)"/>
+    </filter>
+    <circle cx="80" cy="80" r="66" fill="${safeColor}" stroke="#ffffff" stroke-width="8" filter="url(#shadow)"/>
+    <text x="80" y="88" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="${label.length > 1 ? 54 : 68}">${safeLabel}</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function escapeSvgAttribute(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeSvgText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function toolLabel(tool: EditorTool): string {
