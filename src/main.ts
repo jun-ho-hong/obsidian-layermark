@@ -6,6 +6,7 @@ import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-
 import { getPreviewImagePath } from "./preview-paths";
 import { getImageRenderDecision } from "./render-policy";
 import { attachOverlay } from "./render-overlay";
+import { DEFAULT_SETTINGS, SkitchLayerSettingTab, type SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]);
@@ -13,9 +14,12 @@ const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp",
 export default class SkitchLayerPlugin extends Plugin {
   private storage!: AnnotationStorage;
   private refreshTimer: number | null = null;
+  settings: SkitchLayerSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
+    await this.loadSettings();
     this.storage = new AnnotationStorage(this.app);
+    this.addSettingTab(new SkitchLayerSettingTab(this.app, this));
 
     this.addCommand({
       id: "annotate-image-by-path",
@@ -92,9 +96,22 @@ export default class SkitchLayerPlugin extends Plugin {
   }
 
   private openEditor(file: TFile): void {
-    new AnnotationEditorModal(this.app, file, this.storage, async (document) => {
+    new AnnotationEditorModal(this.app, file, this.storage, this.settings, async (document, nextSettings) => {
+      this.settings = nextSettings;
+      await this.saveSettings();
       await this.refreshVisibleAnnotations(document);
     }).open();
+  }
+
+  async loadSettings(): Promise<void> {
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...(await this.loadData())
+    };
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
   }
 
   private async processImages(element: HTMLElement, context: MarkdownPostProcessorContext): Promise<void> {

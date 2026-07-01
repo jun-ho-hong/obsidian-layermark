@@ -74,6 +74,34 @@
   color: var(--text-on-accent);
 }
 
+.skitch-layer-style-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.skitch-layer-color-input {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.skitch-layer-width-input {
+  width: 86px;
+}
+
+.skitch-layer-font-size-input {
+  width: 54px;
+  height: 28px;
+  font-size: 12px;
+}
+
 .skitch-layer-actions {
   margin-left: auto;
   border: 0;
