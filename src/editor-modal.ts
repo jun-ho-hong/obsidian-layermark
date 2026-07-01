@@ -1,19 +1,28 @@
+import { Canvas, Ellipse, FabricImage, Group, Line, PencilBrush, Polyline, Rect, Textbox, Triangle, type FabricObject } from "fabric";
 import { Modal, Notice, Setting, TFile, type App } from "obsidian";
-import { normalizePoint, type AnnotationDocument, type AnnotationObject, type ImageSize, type Point } from "./annotation-model";
+import {
+  denormalizePoint,
+  normalizePoint,
+  type AnnotationDocument,
+  type AnnotationObject,
+  type ImageSize,
+  type Point
+} from "./annotation-model";
+import { getFabricJson, putFabricJson } from "./fabric-adapter";
 import { AnnotationStorage } from "./storage";
-import { createOverlaySvgMarkup } from "./render-overlay";
-import { createPreviewPngBlobFromImageSource } from "./preview-generator";
 
-type Tool = "arrow" | "pen" | "rectangle" | "ellipse" | "text";
+type Tool = "select" | "arrow" | "pen" | "rectangle" | "ellipse" | "text";
+
+const DEFAULT_COLOR = "#ff2b7a";
+const DEFAULT_STROKE_WIDTH = 8;
 
 export class AnnotationEditorModal extends Modal {
   private document: AnnotationDocument | null = null;
   private tool: Tool = "arrow";
-  private drawing = false;
-  private startPoint: Point | null = null;
-  private activePoints: Point[] = [];
-  private overlay: SVGSVGElement | null = null;
-  private stageInner: HTMLDivElement | null = null;
+  private canvas: Canvas | null = null;
+  private fabricCanvasEl: HTMLCanvasElement | null = null;
+  private drawingStart: Point | null = null;
+  private previewObject: FabricObject | null = null;
 
   constructor(
     app: App,
@@ -31,29 +40,43 @@ export class AnnotationEditorModal extends Modal {
     this.contentEl.addClass("skitch-layer-modal");
 
     const toolbar = this.contentEl.createDiv({ cls: "skitch-layer-toolbar" });
+    this.addToolButton(toolbar, "select", "Select");
     this.addToolButton(toolbar, "arrow", "Arrow");
     this.addToolButton(toolbar, "pen", "Pen");
     this.addToolButton(toolbar, "rectangle", "Rect");
     this.addToolButton(toolbar, "ellipse", "Ellipse");
     this.addToolButton(toolbar, "text", "Text");
-    new Setting(toolbar).addButton((button) => {
-      button.setButtonText("Save").setCta().onClick(async () => {
-        await this.saveAndClose();
+    new Setting(toolbar)
+      .addButton((button) => {
+        button.setButtonText("Delete").onClick(() => this.deleteSelection());
+      })
+      .addButton((button) => {
+        button.setButtonText("Save").setCta().onClick(async () => {
+          await this.saveAndClose();
+        });
       });
+
+    const stage = this.contentEl.createDiv({ cls: "skitch-layer-stage skitch-layer-fabric-stage" });
+    this.fabricCanvasEl = stage.createEl("canvas", { cls: "skitch-layer-fabric-canvas" });
+    this.fabricCanvasEl.width = imageSize.width;
+    this.fabricCanvasEl.height = imageSize.height;
+
+    this.canvas = new Canvas(this.fabricCanvasEl, {
+      width: imageSize.width,
+      height: imageSize.height,
+      preserveObjectStacking: true,
+      selection: true
     });
 
-    const stage = this.contentEl.createDiv({ cls: "skitch-layer-stage" });
-    this.stageInner = stage.createDiv({ cls: "skitch-layer-stage-inner" });
-    const image = this.stageInner.createEl("img");
-    image.src = this.app.vault.getResourcePath(this.imageFile);
-    image.alt = this.imageFile.basename;
-
-    await image.decode().catch(() => undefined);
-    this.redrawOverlay();
-    this.wireDrawingSurface();
+    await this.loadFabricScene(this.document, imageSize);
+    this.configureTool();
+    this.wireFabricEvents();
   }
 
   onClose(): void {
+    this.canvas?.dispose();
+    this.canvas = null;
+    this.fabricCanvasEl = null;
     this.contentEl.empty();
   }
 
@@ -64,6 +87,7 @@ export class AnnotationEditorModal extends Modal {
       this.tool = tool;
       toolbar.querySelectorAll("button").forEach((candidate) => candidate.removeClass("is-active"));
       button.addClass("is-active");
+      this.configureTool();
     });
     if (tool === this.tool) {
       button.addClass("is-active");
@@ -80,139 +104,300 @@ export class AnnotationEditorModal extends Modal {
     };
   }
 
-  private wireDrawingSurface(): void {
-    if (!this.overlay) {
+  private async loadFabricScene(document: AnnotationDocument, imageSize: ImageSize): Promise<void> {
+    if (!this.canvas) {
       return;
     }
-    this.overlay.addClass("skitch-layer-drawing-surface");
-    this.overlay.style.pointerEvents = "auto";
-    this.overlay.addEventListener("pointerdown", (event) => this.onPointerDown(event));
-    this.overlay.addEventListener("pointermove", (event) => this.onPointerMove(event));
-    this.overlay.addEventListener("pointerup", (event) => this.onPointerUp(event));
-  }
 
-  private onPointerDown(event: PointerEvent): void {
-    if (!this.document || !this.overlay) {
-      return;
-    }
-    const point = this.toImagePoint(event);
-    if (this.tool === "text") {
-      const text = window.prompt("Annotation text");
-      if (text) {
-        this.document.objects.push({
-          id: crypto.randomUUID(),
-          type: "text",
-          x: point.x,
-          y: point.y,
-          text,
-          style: defaultStyle()
-        });
-        this.redrawOverlay();
-        this.wireDrawingSurface();
-      }
-      return;
-    }
-    this.drawing = true;
-    this.startPoint = point;
-    this.activePoints = [point];
-    this.overlay.setPointerCapture(event.pointerId);
-  }
-
-  private onPointerMove(event: PointerEvent): void {
-    if (!this.drawing || !this.startPoint) {
-      return;
-    }
-    const point = this.toImagePoint(event);
-    if (this.tool === "pen") {
-      this.activePoints.push(point);
+    const fabricJson = getFabricJson(document);
+    if (fabricJson) {
+      await this.canvas.loadFromJSON(fabricJson);
     } else {
-      this.activePoints = [this.startPoint, point];
+      this.addLegacyObjects(document.objects, imageSize);
     }
+
+    await this.addBackgroundImage(imageSize);
+    this.canvas.renderAll();
   }
 
-  private onPointerUp(event: PointerEvent): void {
-    if (!this.document || !this.drawing || !this.startPoint) {
+  private async addBackgroundImage(imageSize: ImageSize): Promise<void> {
+    if (!this.canvas) {
       return;
     }
-    const endPoint = this.toImagePoint(event);
-    const object = this.createObject(this.startPoint, endPoint);
-    if (object) {
-      this.document.objects.push(object);
-      this.redrawOverlay();
-      this.wireDrawingSurface();
-    }
-    this.drawing = false;
-    this.startPoint = null;
-    this.activePoints = [];
+    const image = await FabricImage.fromURL(this.app.vault.getResourcePath(this.imageFile));
+    image.set({
+      left: 0,
+      top: 0,
+      selectable: false,
+      evented: false,
+      skitchRole: "background"
+    } as Partial<FabricObject>);
+    image.scaleToWidth(imageSize.width);
+    image.scaleToHeight(imageSize.height);
+    this.canvas.add(image);
+    this.canvas.sendObjectToBack(image);
   }
 
-  private createObject(startPoint: Point, endPoint: Point): AnnotationObject | null {
-    const style = defaultStyle();
-    if (this.tool === "arrow") {
-      return { id: crypto.randomUUID(), type: "arrow", points: [startPoint, endPoint], style };
+  private addLegacyObjects(objects: AnnotationObject[], imageSize: ImageSize): void {
+    if (!this.canvas) {
+      return;
     }
-    if (this.tool === "pen") {
-      return { id: crypto.randomUUID(), type: "pen", points: this.activePoints.length > 1 ? this.activePoints : [startPoint, endPoint], style };
+    for (const object of objects) {
+      const fabricObject = this.legacyObjectToFabric(object, imageSize);
+      if (fabricObject) {
+        this.canvas.add(fabricObject);
+      }
     }
-    const x = Math.min(startPoint.x, endPoint.x);
-    const y = Math.min(startPoint.y, endPoint.y);
-    const width = Math.abs(endPoint.x - startPoint.x);
-    const height = Math.abs(endPoint.y - startPoint.y);
-    if (width < 0.002 && height < 0.002) {
+  }
+
+  private legacyObjectToFabric(object: AnnotationObject, imageSize: ImageSize): FabricObject | null {
+    const style = {
+      stroke: object.style.color,
+      strokeWidth: object.style.strokeWidth,
+      fill: object.style.fill ?? "transparent",
+      strokeLineCap: "round" as const,
+      strokeLineJoin: "round" as const
+    };
+    if (object.type === "arrow") {
+      const [start, end] = object.points;
+      if (!start || !end) {
+        return null;
+      }
+      return createArrow(denormalizePoint(start, imageSize), denormalizePoint(end, imageSize), object.style.color, object.style.strokeWidth);
+    }
+    if (object.type === "pen") {
+      const points = object.points.map((point) => denormalizePoint(point, imageSize));
+      return new Polyline(points, style);
+    }
+    if (object.type === "rectangle") {
+      const origin = denormalizePoint({ x: object.x, y: object.y }, imageSize);
+      const size = denormalizePoint({ x: object.width, y: object.height }, imageSize);
+      return new Rect({ ...style, left: origin.x, top: origin.y, width: size.x, height: size.y });
+    }
+    if (object.type === "ellipse") {
+      const origin = denormalizePoint({ x: object.x, y: object.y }, imageSize);
+      const size = denormalizePoint({ x: object.width, y: object.height }, imageSize);
+      return new Ellipse({ ...style, left: origin.x, top: origin.y, rx: size.x / 2, ry: size.y / 2 });
+    }
+    if (object.type !== "text") {
       return null;
     }
+    const position = denormalizePoint({ x: object.x, y: object.y }, imageSize);
+    return new Textbox(object.text, {
+      left: position.x,
+      top: position.y,
+      fill: object.style.color,
+      fontSize: object.style.fontSize ?? 28,
+      fontFamily: "var(--font-interface, sans-serif)"
+    });
+  }
+
+  private configureTool(): void {
+    if (!this.canvas) {
+      return;
+    }
+    this.canvas.isDrawingMode = this.tool === "pen";
+    this.canvas.selection = this.tool === "select";
+    this.canvas.defaultCursor = this.tool === "select" ? "default" : "crosshair";
+    this.canvas.getObjects().forEach((object) => {
+      if ((object as FabricObject & { skitchRole?: string }).skitchRole === "background") {
+        object.selectable = false;
+        object.evented = false;
+      } else {
+        object.selectable = this.tool === "select";
+        object.evented = this.tool === "select";
+      }
+    });
+    if (this.canvas.freeDrawingBrush) {
+      this.canvas.freeDrawingBrush.color = DEFAULT_COLOR;
+      this.canvas.freeDrawingBrush.width = DEFAULT_STROKE_WIDTH;
+    } else {
+      this.canvas.freeDrawingBrush = new PencilBrush(this.canvas);
+      this.canvas.freeDrawingBrush.color = DEFAULT_COLOR;
+      this.canvas.freeDrawingBrush.width = DEFAULT_STROKE_WIDTH;
+    }
+    this.canvas.renderAll();
+  }
+
+  private wireFabricEvents(): void {
+    if (!this.canvas) {
+      return;
+    }
+    this.canvas.on("mouse:down", (event) => {
+      if (!this.canvas || this.tool === "select" || this.tool === "pen") {
+        return;
+      }
+      const pointer = this.canvas.getScenePoint(event.e);
+      this.drawingStart = normalizePoint(pointer, this.document?.imageSize ?? { width: 1, height: 1 });
+      if (this.tool === "text") {
+        this.addTextAt(pointer);
+        this.drawingStart = null;
+      }
+    });
+    this.canvas.on("mouse:move", (event) => {
+      if (!this.canvas || !this.drawingStart || this.tool === "text") {
+        return;
+      }
+      const pointer = this.canvas.getScenePoint(event.e);
+      this.replacePreviewObject(this.createDrawnObject(this.drawingStart, pointer));
+    });
+    this.canvas.on("mouse:up", (event) => {
+      if (!this.canvas || !this.drawingStart || this.tool === "text") {
+        return;
+      }
+      const pointer = this.canvas.getScenePoint(event.e);
+      this.replacePreviewObject(null);
+      const object = this.createDrawnObject(this.drawingStart, pointer);
+      if (object) {
+        this.canvas.add(object);
+        this.configureTool();
+      }
+      this.drawingStart = null;
+    });
+  }
+
+  private addTextAt(point: Point): void {
+    if (!this.canvas) {
+      return;
+    }
+    const text = new Textbox("Text", {
+      left: point.x,
+      top: point.y,
+      fill: DEFAULT_COLOR,
+      fontSize: 28,
+      fontFamily: "var(--font-interface, sans-serif)"
+    });
+    this.canvas.add(text);
+    this.canvas.setActiveObject(text);
+    this.tool = "select";
+    this.configureTool();
+  }
+
+  private createDrawnObject(start: Point, endPoint: Point): FabricObject | null {
+    if (!this.document) {
+      return null;
+    }
+    const imageSize = this.document.imageSize;
+    const startPoint = denormalizePoint(start, imageSize);
+    const width = endPoint.x - startPoint.x;
+    const height = endPoint.y - startPoint.y;
+    if (Math.abs(width) < 2 && Math.abs(height) < 2) {
+      return null;
+    }
+    if (this.tool === "arrow") {
+      return createArrow(startPoint, endPoint, DEFAULT_COLOR, DEFAULT_STROKE_WIDTH);
+    }
     if (this.tool === "rectangle") {
-      return { id: crypto.randomUUID(), type: "rectangle", x, y, width, height, style };
+      return new Rect({
+        left: Math.min(startPoint.x, endPoint.x),
+        top: Math.min(startPoint.y, endPoint.y),
+        width: Math.abs(width),
+        height: Math.abs(height),
+        stroke: DEFAULT_COLOR,
+        strokeWidth: DEFAULT_STROKE_WIDTH,
+        fill: "transparent"
+      });
     }
     if (this.tool === "ellipse") {
-      return { id: crypto.randomUUID(), type: "ellipse", x, y, width, height, style };
+      return new Ellipse({
+        left: Math.min(startPoint.x, endPoint.x),
+        top: Math.min(startPoint.y, endPoint.y),
+        rx: Math.abs(width) / 2,
+        ry: Math.abs(height) / 2,
+        stroke: DEFAULT_COLOR,
+        strokeWidth: DEFAULT_STROKE_WIDTH,
+        fill: "transparent"
+      });
     }
     return null;
   }
 
-  private toImagePoint(event: PointerEvent): Point {
-    if (!this.overlay || !this.document) {
-      return { x: 0, y: 0 };
-    }
-    const rect = this.overlay.getBoundingClientRect();
-    return normalizePoint(
-      {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top
-      },
-      { width: rect.width, height: rect.height }
-    );
-  }
-
-  private redrawOverlay(): void {
-    if (!this.document || !this.stageInner) {
+  private replacePreviewObject(object: FabricObject | null): void {
+    if (!this.canvas) {
       return;
     }
-    this.overlay?.remove();
-    const template = document.createElement("template");
-    template.innerHTML = createOverlaySvgMarkup(this.document).trim();
-    this.overlay = template.content.firstElementChild as SVGSVGElement;
-    this.stageInner.appendChild(this.overlay);
+    if (this.previewObject) {
+      this.canvas.remove(this.previewObject);
+      this.previewObject = null;
+    }
+    if (object) {
+      object.evented = false;
+      object.selectable = false;
+      this.previewObject = object;
+      this.canvas.add(object);
+    }
+    this.canvas.renderAll();
+  }
+
+  private deleteSelection(): void {
+    if (!this.canvas) {
+      return;
+    }
+    const activeObjects = this.canvas.getActiveObjects();
+    activeObjects.forEach((object) => this.canvas?.remove(object));
+    this.canvas.discardActiveObject();
+    this.canvas.renderAll();
   }
 
   private async saveAndClose(): Promise<void> {
-    if (!this.document) {
+    if (!this.document || !this.canvas) {
       return;
     }
+    const fabricJson = this.getAnnotationOnlyFabricJson();
+    this.document = putFabricJson({ ...this.document, objects: [] }, fabricJson);
     await this.storage.save(this.document);
-    const imageSrc = this.app.vault.getResourcePath(this.imageFile);
-    const previewBlob = await createPreviewPngBlobFromImageSource(this.document, imageSrc);
-    await this.storage.savePreview(this.document.imagePath, await previewBlob.arrayBuffer());
+    const previewBytes = await dataUrlToArrayBuffer(this.canvas.toDataURL({ format: "png", multiplier: 1 }));
+    await this.storage.savePreview(this.document.imagePath, previewBytes);
     await this.onSave?.(this.document);
     new Notice("Annotation saved");
     this.close();
   }
+
+  private getAnnotationOnlyFabricJson(): unknown {
+    if (!this.canvas) {
+      return {};
+    }
+    const backgroundObjects = this.canvas
+      .getObjects()
+      .filter((object) => (object as FabricObject & { skitchRole?: string }).skitchRole === "background");
+    backgroundObjects.forEach((object) => this.canvas?.remove(object));
+    const json = this.canvas.toJSON();
+    backgroundObjects.forEach((object) => {
+      this.canvas?.add(object);
+      this.canvas?.sendObjectToBack(object);
+    });
+    this.canvas.renderAll();
+    return json;
+  }
 }
 
-function defaultStyle() {
-  return {
-    color: "#ff2b7a",
-    strokeWidth: 8,
-    fontSize: 28
-  };
+function createArrow(start: Point, end: Point, color: string, strokeWidth: number): FabricObject {
+  const angle = (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI + 90;
+  const line = new Line([start.x, start.y, end.x, end.y], {
+    stroke: color,
+    strokeWidth,
+    strokeLineCap: "round",
+    selectable: false,
+    evented: false
+  });
+  const head = new Triangle({
+    left: end.x,
+    top: end.y,
+    originX: "center",
+    originY: "center",
+    width: strokeWidth * 4,
+    height: strokeWidth * 5,
+    fill: color,
+    angle,
+    selectable: false,
+    evented: false
+  });
+  return new Group([line, head], {
+    selectable: true,
+    evented: true
+  });
+}
+
+async function dataUrlToArrayBuffer(dataUrl: string): Promise<ArrayBuffer> {
+  return fetch(dataUrl).then((response) => response.arrayBuffer());
 }

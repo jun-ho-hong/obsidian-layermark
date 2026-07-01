@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "obsidian-skitch-layer",
   "version": "0.1.0",
   "description": "Non-destructive Skitch-style image annotations for Obsidian.",
@@ -24,5 +24,8 @@
     "tslib": "latest",
     "typescript": "latest",
     "vitest": "latest"
+  },
+  "dependencies": {
+    "fabric": "^7.4.0"
   }
 }

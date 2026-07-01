@@ -60,3 +60,16 @@
   height: 100%;
   cursor: crosshair;
 }
+
+.skitch-layer-fabric-stage {
+  display: block;
+  padding: 12px;
+}
+
+.skitch-layer-fabric-stage .canvas-container {
+  max-width: 100%;
+}
+
+.skitch-layer-fabric-canvas {
+  display: block;
+}

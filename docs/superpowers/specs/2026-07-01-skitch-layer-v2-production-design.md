@@ -22,7 +22,7 @@ assets/example/01.jpg.skitch.png
 The JSON sidecar stores editor state and metadata. The PNG sidecar is a generated cache for viewing, copying, and fallback workflows. The plugin treats the PNG as disposable: if it is missing or stale, it can be regenerated from the image and JSON.
 
 ## Editor Direction
-The current hand-written SVG editor is replaced with an engine-backed editor. The preferred engine is tldraw because it already provides selection, resize, move, undo/redo, text, shapes, handles, keyboard behavior, and a modern interaction model. If direct tldraw integration proves incompatible with Obsidian's Electron/CSS/bundling constraints, the fallback is Fabric.js with a smaller Skitch-like toolset.
+The current hand-written SVG editor is replaced with an engine-backed editor. The preferred engine was tldraw because it already provides selection, resize, move, undo/redo, text, shapes, handles, keyboard behavior, and a modern interaction model. During implementation, tldraw was rejected for this first production pass because it requires React, a large CSS payload, and static asset self-hosting inside the Obsidian plugin package. The selected engine for this pass is Fabric.js because it gives object selection, transforms, free drawing, shape editing, text, JSON persistence, and PNG export without a separate React/CSS asset pipeline.
 
 ## Runtime Flow
 1. Obsidian renders normal image embeds.

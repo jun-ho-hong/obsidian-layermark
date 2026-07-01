@@ -45,6 +45,9 @@ export type AnnotationDocument = {
   imagePath: string;
   imageSize: ImageSize;
   objects: AnnotationObject[];
+  engine?: {
+    fabricJson?: unknown;
+  };
   updatedAt: string;
 };
 
@@ -157,6 +160,10 @@ export function annotationToSvgGeometry(annotation: AnnotationObject, imageSize:
       };
     }
   }
+}
+
+export function hasAnnotationContent(document: AnnotationDocument): boolean {
+  return document.objects.length > 0 || Boolean(document.engine?.fabricJson);
 }
 
 function assertPositiveImageSize(imageSize: ImageSize): void {

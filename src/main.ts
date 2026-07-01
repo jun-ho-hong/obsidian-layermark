@@ -1,5 +1,5 @@
 ﻿import { Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
-import { type AnnotationDocument } from "./annotation-model";
+import { hasAnnotationContent, type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
@@ -102,7 +102,7 @@ export default class SkitchLayerPlugin extends Plugin {
     const savedAnnotations = await this.storage.listSavedAnnotations();
     for (const image of images) {
       const annotation = await this.findAnnotationForImage(image, context.sourcePath, savedAnnotations);
-      if (!annotation || annotation.objects.length === 0) {
+      if (!annotation || !hasAnnotationContent(annotation)) {
         continue;
       }
       await this.applyAnnotationToImage(image, annotation);
@@ -201,7 +201,7 @@ export default class SkitchLayerPlugin extends Plugin {
       return;
     }
     const annotation = await this.storage.load(imagePath);
-    if (!annotation || annotation.objects.length === 0) {
+    if (!annotation || !hasAnnotationContent(annotation)) {
       return;
     }
 
@@ -223,7 +223,7 @@ export default class SkitchLayerPlugin extends Plugin {
       return;
     }
     const annotation = await this.storage.load(imagePath);
-    if (!annotation || annotation.objects.length === 0) {
+    if (!annotation || !hasAnnotationContent(annotation)) {
       return;
     }
 
