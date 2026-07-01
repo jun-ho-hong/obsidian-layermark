@@ -253,15 +253,23 @@
 .skitch-layer-text-editor {
   position: absolute;
   z-index: 20;
-  min-width: 120px;
-  padding: 6px 8px;
-  border: 2px solid var(--interactive-accent);
+  min-width: 140px;
+  padding: 2px 4px;
+  border: 1.5px dashed currentColor;
   border-radius: 4px;
   outline: none;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
+  caret-color: currentColor;
   line-height: 1.2;
+  overflow: hidden;
   resize: both;
+  white-space: pre-wrap;
+}
+
+.skitch-layer-text-editor::placeholder {
+  color: currentColor;
+  opacity: 0.55;
 }
 
 .skitch-layer-editor-image {

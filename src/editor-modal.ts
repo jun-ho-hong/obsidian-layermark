@@ -41,6 +41,7 @@ export class AnnotationEditorModal extends Modal {
   private boldButtonEl: HTMLButtonElement | null = null;
   private textEditorEl: HTMLTextAreaElement | null = null;
   private textEditorPoint: Point | null = null;
+  private textEditorObject: Textbox | null = null;
   private drawingStart: Point | null = null;
   private previewObject: FabricObject | null = null;
   private zoom = 1;
@@ -158,6 +159,7 @@ export class AnnotationEditorModal extends Modal {
     this.textEditorEl?.remove();
     this.textEditorEl = null;
     this.textEditorPoint = null;
+    this.textEditorObject = null;
     this.contentEl.empty();
   }
 
@@ -587,17 +589,11 @@ export class AnnotationEditorModal extends Modal {
     this.commitTextEditor();
     editingObject?.set({ visible: false } as Partial<Textbox>);
     this.textEditorPoint = point;
+    this.textEditorObject = editingObject ?? null;
     const editor = this.frameEl.createEl("textarea", { cls: "skitch-layer-text-editor" });
     editor.value = initialText;
-    editor.placeholder = "Text";
-    editor.style.left = `${point.x * this.zoom}px`;
-    editor.style.top = `${point.y * this.zoom}px`;
-    editor.style.width = `${Math.max(220, 280 * this.zoom)}px`;
-    editor.style.minHeight = `${Math.max(48, this.style.fontSize * 1.6 * this.zoom)}px`;
-    editor.style.color = this.style.color;
-    editor.style.fontSize = `${Math.max(14, this.style.fontSize * this.zoom)}px`;
-    editor.style.fontWeight = this.textBold ? "700" : "400";
-    editor.style.fontFamily = this.textFontFamily;
+    editor.placeholder = "텍스트 입력";
+    this.applyTextEditorStyle(editor, point);
     editor.addEventListener("keydown", (event) => {
       event.stopPropagation();
       if (event.key === "Escape") {
@@ -611,15 +607,41 @@ export class AnnotationEditorModal extends Modal {
       }
     });
     editor.addEventListener("input", () => {
-      editor.style.height = "auto";
-      editor.style.height = `${editor.scrollHeight}px`;
+      this.resizeTextEditor(editor);
     });
     editor.addEventListener("blur", () => this.commitTextEditor(editingObject));
     this.textEditorEl = editor;
+    this.resizeTextEditor(editor);
     window.setTimeout(() => {
       editor.focus();
-      editor.select();
+      if (initialText) {
+        editor.select();
+      }
     }, 0);
+  }
+
+  private applyTextEditorStyle(editor: HTMLTextAreaElement, point: Point): void {
+    const fontSize = Math.max(16, this.style.fontSize * this.zoom);
+    editor.style.left = `${point.x * this.zoom}px`;
+    editor.style.top = `${point.y * this.zoom}px`;
+    editor.style.minWidth = `${Math.max(140, fontSize * 3.5)}px`;
+    editor.style.maxWidth = `${Math.max(180, this.document?.imageSize.width ? (this.document.imageSize.width - point.x) * this.zoom : 420)}px`;
+    editor.style.minHeight = `${Math.max(36, fontSize * 1.35)}px`;
+    editor.style.color = this.style.color;
+    editor.style.fontSize = `${fontSize}px`;
+    editor.style.fontWeight = this.textBold ? "700" : "400";
+    editor.style.fontFamily = this.textFontFamily;
+  }
+
+  private resizeTextEditor(editor: HTMLTextAreaElement): void {
+    editor.style.width = "auto";
+    editor.style.height = "auto";
+    const fontSize = Math.max(16, this.style.fontSize * this.zoom);
+    const minWidth = Math.max(140, fontSize * 3.5);
+    const maxWidth = Math.max(minWidth, this.frameEl ? this.frameEl.clientWidth - editor.offsetLeft - 12 : 520);
+    const nextWidth = Math.min(maxWidth, Math.max(minWidth, editor.scrollWidth + 16));
+    editor.style.width = `${nextWidth}px`;
+    editor.style.height = `${Math.max(fontSize * 1.45, editor.scrollHeight)}px`;
   }
 
   private commitTextEditor(editingObject?: Textbox): void {
@@ -629,20 +651,22 @@ export class AnnotationEditorModal extends Modal {
     const value = this.textEditorEl.value.trim();
     const width = Math.max(80, this.textEditorEl.offsetWidth / Math.max(this.zoom, 0.01));
     const point = this.textEditorPoint;
+    const committedEditingObject = this.textEditorObject ?? editingObject;
     this.textEditorEl.remove();
     this.textEditorEl = null;
     this.textEditorPoint = null;
+    this.textEditorObject = null;
 
     if (!value) {
-      if (editingObject) {
-        this.canvas.remove(editingObject);
+      if (committedEditingObject) {
+        this.canvas.remove(committedEditingObject);
       }
       this.setTool("select");
       this.canvas.requestRenderAll();
       return;
     }
 
-    const text = editingObject ?? new Textbox(value);
+    const text = committedEditingObject ?? new Textbox(value);
     text.set({
       text: value,
       left: point.x,
@@ -657,7 +681,7 @@ export class AnnotationEditorModal extends Modal {
       evented: true
     } as Partial<Textbox>);
     applySelectionControls(text);
-    if (!editingObject) {
+    if (!committedEditingObject) {
       this.canvas.add(text);
     }
     this.canvas.setActiveObject(text);
@@ -666,9 +690,11 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private cancelTextEditor(): void {
+    this.textEditorObject?.set({ visible: true } as Partial<Textbox>);
     this.textEditorEl?.remove();
     this.textEditorEl = null;
     this.textEditorPoint = null;
+    this.textEditorObject = null;
     this.setTool("select");
     this.canvas?.requestRenderAll();
   }
@@ -843,6 +869,10 @@ export class AnnotationEditorModal extends Modal {
     this.frameEl?.style.setProperty("height", height);
     this.canvas.setDimensions({ width: "100%", height: "100%" }, { cssOnly: true });
     this.zoomLabelEl?.setText(formatZoomPercent(this.zoom));
+    if (this.textEditorEl && this.textEditorPoint) {
+      this.applyTextEditorStyle(this.textEditorEl, this.textEditorPoint);
+      this.resizeTextEditor(this.textEditorEl);
+    }
     this.canvas.requestRenderAll();
   }
 
