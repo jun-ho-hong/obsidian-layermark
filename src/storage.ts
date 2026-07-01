@@ -38,6 +38,20 @@ export class AnnotationStorage {
     }
   }
 
+  async listSavedAnnotations(): Promise<AnnotationDocument[]> {
+    const annotationFiles = this.app.vault.getFiles().filter((file) => file.path.endsWith(".skitch.json"));
+    const annotations: AnnotationDocument[] = [];
+    for (const file of annotationFiles) {
+      try {
+        const raw = await this.app.vault.read(file);
+        annotations.push(JSON.parse(raw) as AnnotationDocument);
+      } catch (error) {
+        console.warn(`Unable to read Skitch Layer annotation file: ${file.path}`, error);
+      }
+    }
+    return annotations;
+  }
+
   async save(document: AnnotationDocument): Promise<void> {
     const sidecarPath = this.getSidecarPath(document.imagePath);
     const serialized = JSON.stringify(
@@ -56,3 +70,4 @@ export class AnnotationStorage {
     await this.app.vault.create(sidecarPath, serialized);
   }
 }
+

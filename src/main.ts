@@ -1,6 +1,7 @@
-import { Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
+﻿import { Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
 import { type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
+import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { attachOverlay } from "./render-overlay";
 import { AnnotationStorage } from "./storage";
 
@@ -24,6 +25,13 @@ export default class SkitchLayerPlugin extends Plugin {
       });
     });
 
+    this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
+      this.copySelectedAnnotatedImage(event).catch((error) => {
+        console.warn("Skitch Layer failed to copy annotated image", error);
+        new Notice(error instanceof Error ? error.message : "Unable to copy annotated image");
+      });
+    });
+
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu: Menu, file) => {
         if (file instanceof TFile && this.isSupportedImage(file)) {
@@ -36,6 +44,10 @@ export default class SkitchLayerPlugin extends Plugin {
         }
       })
     );
+
+    this.app.workspace.onLayoutReady(() => {
+      this.refreshAllVisibleAnnotations().catch((error) => console.warn("Skitch Layer failed to refresh annotations", error));
+    });
   }
 
   private async promptForImagePath(): Promise<void> {
@@ -60,12 +72,9 @@ export default class SkitchLayerPlugin extends Plugin {
 
   private async processImages(element: HTMLElement, context: MarkdownPostProcessorContext): Promise<void> {
     const images = Array.from(element.querySelectorAll("img"));
+    const savedAnnotations = await this.storage.listSavedAnnotations();
     for (const image of images) {
-      const imageFile = this.resolveImageFile(image, context.sourcePath);
-      if (!imageFile) {
-        continue;
-      }
-      const annotation = await this.storage.load(imageFile.path);
+      const annotation = await this.findAnnotationForImage(image, context.sourcePath, savedAnnotations);
       if (!annotation || annotation.objects.length === 0) {
         continue;
       }
@@ -73,15 +82,44 @@ export default class SkitchLayerPlugin extends Plugin {
     }
   }
 
-  private async refreshVisibleAnnotations(annotation: AnnotationDocument): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
-    if (!(file instanceof TFile)) {
-      return;
+  private async findAnnotationForImage(
+    image: HTMLImageElement,
+    sourcePath: string,
+    savedAnnotations: AnnotationDocument[]
+  ): Promise<AnnotationDocument | null> {
+    const imageFile = this.resolveImageFile(image, sourcePath);
+    if (imageFile) {
+      return this.storage.load(imageFile.path);
     }
 
+    for (const annotation of savedAnnotations) {
+      const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+      if (file instanceof TFile && this.imageMatchesFile(image, file)) {
+        return annotation;
+      }
+      if (this.imageLooksLikeAnnotationTarget(image, annotation)) {
+        return annotation;
+      }
+    }
+    return null;
+  }
+
+  private async refreshAllVisibleAnnotations(): Promise<void> {
+    const annotations = await this.storage.listSavedAnnotations();
+    for (const annotation of annotations) {
+      await this.refreshVisibleAnnotations(annotation);
+    }
+  }
+
+  private async refreshVisibleAnnotations(annotation: AnnotationDocument): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     const images = Array.from(document.querySelectorAll<HTMLImageElement>(".workspace-leaf-content img"));
     for (const image of images) {
-      if (this.imageMatchesFile(image, file)) {
+      if (file instanceof TFile && this.imageMatchesFile(image, file)) {
+        this.applyAnnotationToImage(image, annotation);
+        continue;
+      }
+      if (this.imageLooksLikeAnnotationTarget(image, annotation)) {
         this.applyAnnotationToImage(image, annotation);
       }
     }
@@ -100,8 +138,45 @@ export default class SkitchLayerPlugin extends Plugin {
       wrapper.appendChild(image);
     }
 
+    wrapper.dataset.skitchImagePath = annotation.imagePath;
     wrapper.querySelectorAll(":scope > .skitch-layer-overlay").forEach((overlay) => overlay.remove());
     attachOverlay(wrapper, annotation);
+  }
+
+  private async copySelectedAnnotatedImage(event: ClipboardEvent): Promise<void> {
+    const wrapper = this.findCopyTargetWrapper(event);
+    if (!wrapper) {
+      return;
+    }
+    const image = wrapper.querySelector<HTMLImageElement>("img");
+    const imagePath = wrapper.dataset.skitchImagePath;
+    if (!image || !imagePath) {
+      return;
+    }
+    const annotation = await this.storage.load(imagePath);
+    if (!annotation || annotation.objects.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    await copyAnnotatedImageToClipboard(image, annotation);
+    new Notice("Annotated image copied");
+  }
+
+  private findCopyTargetWrapper(event: ClipboardEvent): HTMLElement | null {
+    const selection = document.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const selectedWrappers = Array.from(document.querySelectorAll<HTMLElement>(".skitch-layer-wrapper"));
+      const selectedWrapper = selectedWrappers.find((wrapper) => range.intersectsNode(wrapper));
+      if (selectedWrapper) {
+        return selectedWrapper;
+      }
+    }
+
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    return target?.closest<HTMLElement>(".skitch-layer-wrapper") ?? document.querySelector<HTMLElement>(".skitch-layer-wrapper:hover");
   }
 
   private resolveImageFile(image: HTMLImageElement, sourcePath: string): TFile | null {
@@ -135,6 +210,12 @@ export default class SkitchLayerPlugin extends Plugin {
       return true;
     }
     return imageSource.includes(encodeURI(file.path)) || imageSource.includes(file.path) || image.alt === file.basename || image.alt === file.path;
+  }
+
+  private imageLooksLikeAnnotationTarget(image: HTMLImageElement, annotation: AnnotationDocument): boolean {
+    const filename = annotation.imagePath.split("/").pop() ?? annotation.imagePath;
+    const decodedSource = this.normalizeUrlForCompare(image.src);
+    return image.alt === filename || image.alt === annotation.imagePath || decodedSource.includes(filename) || decodedSource.includes(annotation.imagePath);
   }
 
   private findImageFileByResourceSrc(src: string): TFile | null {
