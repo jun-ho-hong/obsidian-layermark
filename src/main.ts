@@ -3,6 +3,8 @@ import { type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
+import { getPreviewImagePath } from "./preview-paths";
+import { getImageRenderDecision } from "./render-policy";
 import { attachOverlay } from "./render-overlay";
 import { AnnotationStorage } from "./storage";
 
@@ -103,7 +105,7 @@ export default class SkitchLayerPlugin extends Plugin {
       if (!annotation || annotation.objects.length === 0) {
         continue;
       }
-      this.applyAnnotationToImage(image, annotation);
+      await this.applyAnnotationToImage(image, annotation);
     }
   }
 
@@ -153,16 +155,16 @@ export default class SkitchLayerPlugin extends Plugin {
     const images = Array.from(document.querySelectorAll<HTMLImageElement>(".workspace-leaf-content img"));
     for (const image of images) {
       if (file instanceof TFile && this.imageMatchesFile(image, file)) {
-        this.applyAnnotationToImage(image, annotation);
+        await this.applyAnnotationToImage(image, annotation);
         continue;
       }
       if (imageLooksLikeAnnotationTarget(image, annotation)) {
-        this.applyAnnotationToImage(image, annotation);
+        await this.applyAnnotationToImage(image, annotation);
       }
     }
   }
 
-  private applyAnnotationToImage(image: HTMLImageElement, annotation: AnnotationDocument): void {
+  private async applyAnnotationToImage(image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
     const parent = image.parentElement;
     if (!parent) {
       return;
@@ -177,6 +179,14 @@ export default class SkitchLayerPlugin extends Plugin {
 
     wrapper.dataset.skitchImagePath = annotation.imagePath;
     wrapper.querySelectorAll(":scope > .skitch-layer-overlay").forEach((overlay) => overlay.remove());
+    const previewPath = getPreviewImagePath(annotation.imagePath);
+    const previewFile = this.app.vault.getAbstractFileByPath(previewPath);
+    const decision = getImageRenderDecision(annotation.imagePath, annotation, previewFile instanceof TFile);
+    if (decision.mode === "preview" && previewFile instanceof TFile) {
+      image.dataset.skitchOriginalPath = annotation.imagePath;
+      image.src = this.app.vault.getResourcePath(previewFile);
+      return;
+    }
     attachOverlay(wrapper, annotation);
   }
 
