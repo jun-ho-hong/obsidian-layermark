@@ -1,12 +1,16 @@
 import { normalizePath, TFile, type App } from "obsidian";
 import { type AnnotationDocument, type ImageSize } from "./annotation-model";
-import { getAnnotationSidecarPath, isSkitchSidecarPath } from "./preview-paths";
+import { getAnnotationSidecarPath, getPreviewImagePath, isSkitchSidecarPath } from "./preview-paths";
 
 export class AnnotationStorage {
   constructor(private readonly app: App) {}
 
   getSidecarPath(imagePath: string): string {
     return normalizePath(getAnnotationSidecarPath(imagePath));
+  }
+
+  getPreviewPath(imagePath: string): string {
+    return normalizePath(getPreviewImagePath(imagePath));
   }
 
   async loadOrCreate(imageFile: TFile, imageSize: ImageSize): Promise<AnnotationDocument> {
@@ -69,6 +73,17 @@ export class AnnotationStorage {
       return;
     }
     await this.app.vault.create(sidecarPath, serialized);
+  }
+
+  async savePreview(imagePath: string, bytes: ArrayBuffer): Promise<string> {
+    const previewPath = this.getPreviewPath(imagePath);
+    const existing = this.app.vault.getAbstractFileByPath(previewPath);
+    if (existing instanceof TFile) {
+      await this.app.vault.modifyBinary(existing, bytes);
+      return previewPath;
+    }
+    await this.app.vault.createBinary(previewPath, bytes);
+    return previewPath;
   }
 }
 

@@ -2,6 +2,7 @@ import { Modal, Notice, Setting, TFile, type App } from "obsidian";
 import { normalizePoint, type AnnotationDocument, type AnnotationObject, type ImageSize, type Point } from "./annotation-model";
 import { AnnotationStorage } from "./storage";
 import { createOverlaySvgMarkup } from "./render-overlay";
+import { createPreviewPngBlobFromImageSource } from "./preview-generator";
 
 type Tool = "arrow" | "pen" | "rectangle" | "ellipse" | "text";
 
@@ -199,6 +200,9 @@ export class AnnotationEditorModal extends Modal {
       return;
     }
     await this.storage.save(this.document);
+    const imageSrc = this.app.vault.getResourcePath(this.imageFile);
+    const previewBlob = await createPreviewPngBlobFromImageSource(this.document, imageSrc);
+    await this.storage.savePreview(this.document.imagePath, await previewBlob.arrayBuffer());
     await this.onSave?.(this.document);
     new Notice("Annotation saved");
     this.close();
