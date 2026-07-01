@@ -17,8 +17,9 @@ export async function copyAnnotatedImageToClipboard(image: HTMLImageElement, ann
     throw new Error("Clipboard image writing is not available in this Obsidian environment.");
   }
 
+  const sourceSrc = image.dataset.skitchOriginalSrc || image.src;
   const blob = hasFabricObjects(annotation)
-    ? await createFabricPreviewPngBlob(annotation, image.src)
+    ? await createFabricPreviewPngBlob(annotation, sourceSrc)
     : await createLegacyAnnotationPngBlob(image, annotation);
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 }

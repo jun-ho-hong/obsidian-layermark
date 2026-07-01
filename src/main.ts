@@ -4,6 +4,7 @@ import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
 import { putFabricJson } from "./fabric-adapter";
+import { createFabricPreviewPngBlob } from "./fabric-preview";
 import { attachFabricOverlay, attachOverlay, hasFabricOverlay } from "./render-overlay";
 import { DEFAULT_SETTINGS, SkitchLayerSettingTab, type SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
@@ -13,6 +14,7 @@ const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp",
 export default class SkitchLayerPlugin extends Plugin {
   private storage!: AnnotationStorage;
   private refreshTimer: number | null = null;
+  private runtimePreviewUrls = new Set<string>();
   settings: SkitchLayerSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
@@ -43,6 +45,12 @@ export default class SkitchLayerPlugin extends Plugin {
       this.openAnnotatedImageContextMenu(event).catch((error) => {
         console.warn("Skitch Layer failed to open annotated image menu", error);
       });
+    });
+    this.register(() => {
+      for (const url of this.runtimePreviewUrls) {
+        URL.revokeObjectURL(url);
+      }
+      this.runtimePreviewUrls.clear();
     });
 
     this.registerEvent(
@@ -196,15 +204,38 @@ export default class SkitchLayerPlugin extends Plugin {
     wrapper.dataset.skitchImagePath = annotation.imagePath;
     wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
     const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+    const originalSrc = originalFile instanceof TFile ? this.app.vault.getResourcePath(originalFile) : image.src;
     if (originalFile instanceof TFile) {
       image.dataset.skitchOriginalPath = annotation.imagePath;
-      image.src = this.app.vault.getResourcePath(originalFile);
     }
+    image.dataset.skitchOriginalSrc = originalSrc;
     if (hasFabricOverlay(annotation)) {
-      await attachFabricOverlay(wrapper, annotation);
+      try {
+        const blob = await createFabricPreviewPngBlob(annotation, originalSrc);
+        const url = URL.createObjectURL(blob);
+        this.revokeRuntimePreviewUrl(image.dataset.skitchRuntimePreviewUrl);
+        this.runtimePreviewUrls.add(url);
+        image.dataset.skitchRuntimePreviewUrl = url;
+        image.src = url;
+      } catch (error) {
+        console.warn("Skitch Layer failed to render runtime annotated image", error);
+        image.src = originalSrc;
+        await attachFabricOverlay(wrapper, annotation);
+      }
       return;
     }
+    this.revokeRuntimePreviewUrl(image.dataset.skitchRuntimePreviewUrl);
+    image.dataset.skitchRuntimePreviewUrl = "";
+    image.src = originalSrc;
     attachOverlay(wrapper, annotation);
+  }
+
+  private revokeRuntimePreviewUrl(url: string | undefined): void {
+    if (!url || !this.runtimePreviewUrls.has(url)) {
+      return;
+    }
+    URL.revokeObjectURL(url);
+    this.runtimePreviewUrls.delete(url);
   }
 
   private async copySelectedAnnotatedImage(event: ClipboardEvent): Promise<void> {
