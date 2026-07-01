@@ -581,30 +581,42 @@ export class AnnotationEditorModal extends Modal {
       fill: this.style.color,
       fontSize: this.style.fontSize,
       fontWeight: this.textBold ? "700" : "400",
-      fontFamily: this.textFontFamily
+      fontFamily: this.textFontFamily,
+      selectable: true,
+      evented: true
     });
     applySelectionControls(text);
     this.canvas.add(text);
     this.canvas.setActiveObject(text);
-    text.enterEditing();
-    text.selectAll();
-    this.setTool("select");
+    text.once("editing:exited", () => this.setTool("select"));
+    window.setTimeout(() => {
+      if (!this.canvas) {
+        return;
+      }
+      this.canvas.setActiveObject(text);
+      text.enterEditing();
+      text.selectAll();
+      text.hiddenTextarea?.focus();
+      this.canvas.requestRenderAll();
+    }, 0);
   }
 
   private addBadgeAt(point: Point): void {
     if (!this.canvas) {
       return;
     }
-    const radius = Math.max(22, Math.min(42, this.style.fontSize * 0.52));
+    const radius = Math.max(32, Math.min(72, this.style.fontSize * 0.82));
     const number = this.settings.nextBadgeNumber;
     const badgeId = `badge-${Date.now()}-${number}`;
     const circle = new Circle({
       left: -radius,
       top: -radius,
       radius,
-      fill: this.style.color,
-      stroke: "#ffffff",
-      strokeWidth: Math.max(4, Math.round(this.style.strokeWidth / 2)),
+      fill: "transparent",
+      stroke: this.style.color,
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      strokeWidth: Math.max(7, Math.round(this.style.strokeWidth * 0.9)),
       skitchKind: "badge",
       skitchBadgeId: badgeId,
       skitchBadgePart: "shape"
@@ -614,20 +626,21 @@ export class AnnotationEditorModal extends Modal {
       top: 1,
       originX: "center",
       originY: "center",
-      fill: "#ffffff",
-      fontSize: Math.max(16, radius * 0.72),
-      fontWeight: "700",
+      fill: this.style.color,
+      stroke: this.style.color,
+      strokeWidth: Math.max(1, Math.round(this.style.strokeWidth * 0.14)),
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      fontSize: Math.max(34, radius * 1.3),
+      fontWeight: "800",
       textAlign: "center",
-      fontFamily: "Arial, Helvetica, sans-serif",
+      fontFamily: "\"Segoe Print\", \"Comic Sans MS\", \"Arial Rounded MT Bold\", sans-serif",
       selectable: true,
       evented: true,
       skitchKind: "badge",
       skitchBadgeId: badgeId,
       skitchBadgePart: "label"
     } as Partial<Text>);
-    circle.set({
-      shadow: new Shadow({ color: "rgba(0,0,0,0.35)", blur: 6, offsetX: 0, offsetY: 2 })
-    } as Partial<Circle>);
     const badge = new Group([circle, label], {
       left: point.x,
       top: point.y,
