@@ -1,11 +1,12 @@
-﻿import { normalizePath, TFile, type App } from "obsidian";
-import { getSidecarAnnotationPath, type AnnotationDocument, type ImageSize } from "./annotation-model";
+import { normalizePath, TFile, type App } from "obsidian";
+import { type AnnotationDocument, type ImageSize } from "./annotation-model";
+import { getAnnotationSidecarPath, isSkitchSidecarPath } from "./preview-paths";
 
 export class AnnotationStorage {
   constructor(private readonly app: App) {}
 
   getSidecarPath(imagePath: string): string {
-    return normalizePath(getSidecarAnnotationPath(imagePath));
+    return normalizePath(getAnnotationSidecarPath(imagePath));
   }
 
   async loadOrCreate(imageFile: TFile, imageSize: ImageSize): Promise<AnnotationDocument> {
@@ -39,7 +40,7 @@ export class AnnotationStorage {
   }
 
   async listSavedAnnotations(): Promise<AnnotationDocument[]> {
-    const annotationFiles = this.app.vault.getFiles().filter((file) => file.path.endsWith(".skitch.json"));
+    const annotationFiles = this.app.vault.getFiles().filter((file) => isSkitchSidecarPath(file.path));
     const annotations: AnnotationDocument[] = [];
     for (const file of annotationFiles) {
       try {
