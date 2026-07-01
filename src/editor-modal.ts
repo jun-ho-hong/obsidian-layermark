@@ -9,6 +9,7 @@ import {
   type Point
 } from "./annotation-model";
 import { getFabricJson, putFabricJson } from "./fabric-adapter";
+import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import { AnnotationStorage } from "./storage";
 
 type Tool = "select" | "arrow" | "pen" | "rectangle" | "ellipse" | "text";
@@ -36,17 +37,20 @@ export class AnnotationEditorModal extends Modal {
   async onOpen(): Promise<void> {
     const imageSize = await this.measureImage();
     this.document = await this.storage.loadOrCreate(this.imageFile, imageSize);
+    this.modalEl.addClass("skitch-layer-modal-container");
     this.contentEl.empty();
     this.contentEl.addClass("skitch-layer-modal");
 
     const toolbar = this.contentEl.createDiv({ cls: "skitch-layer-toolbar" });
-    this.addToolButton(toolbar, "select", "Select");
-    this.addToolButton(toolbar, "arrow", "Arrow");
-    this.addToolButton(toolbar, "pen", "Pen");
-    this.addToolButton(toolbar, "rectangle", "Rect");
-    this.addToolButton(toolbar, "ellipse", "Ellipse");
-    this.addToolButton(toolbar, "text", "Text");
-    new Setting(toolbar)
+    toolbar.createDiv({ cls: "skitch-layer-toolbar-title", text: this.imageFile.name });
+    const toolGroup = toolbar.createDiv({ cls: "skitch-layer-tool-group" });
+    this.addToolButton(toolGroup, "select", "Select");
+    this.addToolButton(toolGroup, "arrow", "Arrow");
+    this.addToolButton(toolGroup, "pen", "Pen");
+    this.addToolButton(toolGroup, "rectangle", "Rect");
+    this.addToolButton(toolGroup, "ellipse", "Ellipse");
+    this.addToolButton(toolGroup, "text", "Text");
+    new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }))
       .addButton((button) => {
         button.setButtonText("Delete").onClick(() => this.deleteSelection());
       })
@@ -64,6 +68,7 @@ export class AnnotationEditorModal extends Modal {
     this.canvas = new Canvas(this.fabricCanvasEl, {
       width: imageSize.width,
       height: imageSize.height,
+      enableRetinaScaling: false,
       preserveObjectStacking: true,
       selection: true
     });
@@ -346,7 +351,8 @@ export class AnnotationEditorModal extends Modal {
     const fabricJson = this.getAnnotationOnlyFabricJson();
     this.document = putFabricJson({ ...this.document, objects: [] }, fabricJson);
     await this.storage.save(this.document);
-    const previewBytes = await dataUrlToArrayBuffer(this.canvas.toDataURL({ format: "png", multiplier: 1 }));
+    const previewBlob = await createFabricPreviewPngBlob(this.document, this.app.vault.getResourcePath(this.imageFile));
+    const previewBytes = await previewBlob.arrayBuffer();
     await this.storage.savePreview(this.document.imagePath, previewBytes);
     await this.onSave?.(this.document);
     new Notice("Annotation saved");
@@ -357,17 +363,8 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return {};
     }
-    const backgroundObjects = this.canvas
-      .getObjects()
-      .filter((object) => (object as FabricObject & { skitchRole?: string }).skitchRole === "background");
-    backgroundObjects.forEach((object) => this.canvas?.remove(object));
-    const json = this.canvas.toJSON();
-    backgroundObjects.forEach((object) => {
-      this.canvas?.add(object);
-      this.canvas?.sendObjectToBack(object);
-    });
-    this.canvas.renderAll();
-    return json;
+    const toJsonWithProperties = this.canvas.toJSON as unknown as (propertiesToInclude?: string[]) => unknown;
+    return stripSkitchBackgroundObjects(toJsonWithProperties(["skitchRole"]));
   }
 }
 
@@ -396,8 +393,4 @@ function createArrow(start: Point, end: Point, color: string, strokeWidth: numbe
     selectable: true,
     evented: true
   });
-}
-
-async function dataUrlToArrayBuffer(dataUrl: string): Promise<ArrayBuffer> {
-  return fetch(dataUrl).then((response) => response.arrayBuffer());
 }

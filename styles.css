@@ -18,26 +18,91 @@
   overflow: visible;
 }
 
+.skitch-layer-modal-container {
+  width: min(1180px, 94vw);
+  max-width: 94vw;
+}
+
 .skitch-layer-modal {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  height: min(88vh, 920px);
+  gap: 0;
+  height: min(88vh, 940px);
+  color: var(--text-normal);
 }
 
 .skitch-layer-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
+  padding: 12px 4px 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.skitch-layer-toolbar-title {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skitch-layer-tool-group {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.skitch-layer-tool-group button {
+  min-width: 54px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.skitch-layer-tool-group button.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.skitch-layer-actions {
+  margin-left: auto;
+  border: 0;
+}
+
+.skitch-layer-actions .setting-item {
+  padding: 0;
+  border: 0;
+}
+
+.skitch-layer-actions .setting-item-control {
+  gap: 8px;
 }
 
 .skitch-layer-stage {
   flex: 1;
   min-height: 360px;
   overflow: auto;
-  background: var(--background-secondary);
+  margin-top: 14px;
+  background:
+    linear-gradient(45deg, var(--background-secondary) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--background-secondary) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--background-secondary) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--background-secondary) 75%),
+    var(--background-primary);
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  background-size: 20px 20px;
   border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
   position: relative;
 }
 
@@ -63,11 +128,13 @@
 
 .skitch-layer-fabric-stage {
   display: block;
-  padding: 12px;
+  padding: 16px;
 }
 
 .skitch-layer-fabric-stage .canvas-container {
   max-width: 100%;
+  border-radius: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
 
 .skitch-layer-fabric-canvas {
