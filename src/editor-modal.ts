@@ -39,6 +39,8 @@ export class AnnotationEditorModal extends Modal {
   private fontSizeInputEl: HTMLInputElement | null = null;
   private fontFamilySelectEl: HTMLSelectElement | null = null;
   private boldButtonEl: HTMLButtonElement | null = null;
+  private textEditorEl: HTMLTextAreaElement | null = null;
+  private textEditorPoint: Point | null = null;
   private drawingStart: Point | null = null;
   private previewObject: FabricObject | null = null;
   private zoom = 1;
@@ -153,6 +155,9 @@ export class AnnotationEditorModal extends Modal {
     this.fontSizeInputEl = null;
     this.fontFamilySelectEl = null;
     this.boldButtonEl = null;
+    this.textEditorEl?.remove();
+    this.textEditorEl = null;
+    this.textEditorPoint = null;
     this.contentEl.empty();
   }
 
@@ -376,9 +381,7 @@ export class AnnotationEditorModal extends Modal {
     this.canvas.on("mouse:dblclick", (event) => {
       const target = event.target;
       if (target && (target.type === "textbox" || target.type === "i-text" || target.type === "text")) {
-        this.canvas?.setActiveObject(target);
-        (target as Textbox).enterEditing();
-        (target as Textbox).selectAll();
+        this.beginTextEditAt({ x: Number(target.left) || 0, y: Number(target.top) || 0 }, String((target as Textbox).text || ""), target as Textbox);
       }
     });
     this.canvas.on("mouse:down", (event) => {
@@ -465,6 +468,9 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private isTypingText(): boolean {
+    if (this.textEditorEl && document.activeElement === this.textEditorEl) {
+      return true;
+    }
     const activeObject = this.canvas?.getActiveObject();
     if (activeObject && (activeObject.type === "textbox" || activeObject.type === "i-text" || activeObject.type === "text")) {
       return Boolean((activeObject as Textbox).isEditing);
@@ -571,34 +577,100 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private addTextAt(point: Point): void {
-    if (!this.canvas) {
+    this.beginTextEditAt(point, "");
+  }
+
+  private beginTextEditAt(point: Point, initialText: string, editingObject?: Textbox): void {
+    if (!this.canvas || !this.frameEl) {
       return;
     }
-    const text = new Textbox("Text", {
+    this.commitTextEditor();
+    editingObject?.set({ visible: false } as Partial<Textbox>);
+    this.textEditorPoint = point;
+    const editor = this.frameEl.createEl("textarea", { cls: "skitch-layer-text-editor" });
+    editor.value = initialText;
+    editor.placeholder = "Text";
+    editor.style.left = `${point.x * this.zoom}px`;
+    editor.style.top = `${point.y * this.zoom}px`;
+    editor.style.width = `${Math.max(220, 280 * this.zoom)}px`;
+    editor.style.minHeight = `${Math.max(48, this.style.fontSize * 1.6 * this.zoom)}px`;
+    editor.style.color = this.style.color;
+    editor.style.fontSize = `${Math.max(14, this.style.fontSize * this.zoom)}px`;
+    editor.style.fontWeight = this.textBold ? "700" : "400";
+    editor.style.fontFamily = this.textFontFamily;
+    editor.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        editingObject?.set({ visible: true } as Partial<Textbox>);
+        this.cancelTextEditor();
+      }
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        this.commitTextEditor(editingObject);
+      }
+    });
+    editor.addEventListener("input", () => {
+      editor.style.height = "auto";
+      editor.style.height = `${editor.scrollHeight}px`;
+    });
+    editor.addEventListener("blur", () => this.commitTextEditor(editingObject));
+    this.textEditorEl = editor;
+    window.setTimeout(() => {
+      editor.focus();
+      editor.select();
+    }, 0);
+  }
+
+  private commitTextEditor(editingObject?: Textbox): void {
+    if (!this.canvas || !this.textEditorEl || !this.textEditorPoint) {
+      return;
+    }
+    const value = this.textEditorEl.value.trim();
+    const width = Math.max(80, this.textEditorEl.offsetWidth / Math.max(this.zoom, 0.01));
+    const point = this.textEditorPoint;
+    this.textEditorEl.remove();
+    this.textEditorEl = null;
+    this.textEditorPoint = null;
+
+    if (!value) {
+      if (editingObject) {
+        this.canvas.remove(editingObject);
+      }
+      this.setTool("select");
+      this.canvas.requestRenderAll();
+      return;
+    }
+
+    const text = editingObject ?? new Textbox(value);
+    text.set({
+      text: value,
       left: point.x,
       top: point.y,
-      width: 260,
+      width,
+      visible: true,
       fill: this.style.color,
       fontSize: this.style.fontSize,
       fontWeight: this.textBold ? "700" : "400",
       fontFamily: this.textFontFamily,
       selectable: true,
       evented: true
-    });
+    } as Partial<Textbox>);
     applySelectionControls(text);
-    this.canvas.add(text);
+    if (!editingObject) {
+      this.canvas.add(text);
+    }
     this.canvas.setActiveObject(text);
-    text.once("editing:exited", () => this.setTool("select"));
-    window.setTimeout(() => {
-      if (!this.canvas) {
-        return;
-      }
-      this.canvas.setActiveObject(text);
-      text.enterEditing();
-      text.selectAll();
-      text.hiddenTextarea?.focus();
-      this.canvas.requestRenderAll();
-    }, 0);
+    this.setTool("select");
+    this.canvas.requestRenderAll();
+  }
+
+  private cancelTextEditor(): void {
+    this.textEditorEl?.remove();
+    this.textEditorEl = null;
+    this.textEditorPoint = null;
+    this.setTool("select");
+    this.canvas?.requestRenderAll();
   }
 
   private addBadgeAt(point: Point): void {

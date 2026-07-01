@@ -11,14 +11,14 @@ describe("editor tools", () => {
     expect(toolFromShortcut("6")).toBe("ellipse");
     expect(toolFromShortcut("7")).toBe("arrow");
     expect(toolFromShortcut("8")).toBe("badge");
-    expect(toolFromShortcut("v")).toBe("select");
-    expect(toolFromShortcut("P")).toBe("pen");
-    expect(toolFromShortcut("t")).toBe("text");
-    expect(toolFromShortcut("h")).toBe("highlight");
-    expect(toolFromShortcut("r")).toBe("rectangle");
-    expect(toolFromShortcut("e")).toBe("ellipse");
-    expect(toolFromShortcut("a")).toBe("arrow");
-    expect(toolFromShortcut("b")).toBe("badge");
+    expect(toolFromShortcut("v")).toBeNull();
+    expect(toolFromShortcut("P")).toBeNull();
+    expect(toolFromShortcut("t")).toBeNull();
+    expect(toolFromShortcut("h")).toBeNull();
+    expect(toolFromShortcut("r")).toBeNull();
+    expect(toolFromShortcut("e")).toBeNull();
+    expect(toolFromShortcut("a")).toBeNull();
+    expect(toolFromShortcut("b")).toBeNull();
   });
 
   it("increments badge numbers from at least one", () => {

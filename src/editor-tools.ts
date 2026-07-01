@@ -20,16 +20,7 @@ const TOOL_SHORTCUTS: Record<string, EditorTool> = {
   "5": "rectangle",
   "6": "ellipse",
   "7": "arrow",
-  "8": "badge",
-  v: "select",
-  s: "select",
-  p: "pen",
-  t: "text",
-  h: "highlight",
-  r: "rectangle",
-  e: "ellipse",
-  a: "arrow",
-  b: "badge"
+  "8": "badge"
 };
 
 export function toolFromShortcut(key: string): EditorTool | null {
