@@ -10,6 +10,7 @@ import {
 } from "./annotation-model";
 import { getFabricJson, putFabricJson } from "./fabric-adapter";
 import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
+import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
 import { AnnotationStorage } from "./storage";
 
 type Tool = "select" | "arrow" | "pen" | "rectangle" | "ellipse" | "text";
@@ -22,8 +23,12 @@ export class AnnotationEditorModal extends Modal {
   private tool: Tool = "arrow";
   private canvas: Canvas | null = null;
   private fabricCanvasEl: HTMLCanvasElement | null = null;
+  private stageEl: HTMLDivElement | null = null;
+  private zoomLabelEl: HTMLElement | null = null;
   private drawingStart: Point | null = null;
   private previewObject: FabricObject | null = null;
+  private zoom = 1;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(
     app: App,
@@ -50,18 +55,31 @@ export class AnnotationEditorModal extends Modal {
     this.addToolButton(toolGroup, "rectangle", "Rect");
     this.addToolButton(toolGroup, "ellipse", "Ellipse");
     this.addToolButton(toolGroup, "text", "Text");
-    new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }))
-      .addButton((button) => {
-        button.setButtonText("Delete").onClick(() => this.deleteSelection());
-      })
-      .addButton((button) => {
-        button.setButtonText("Save").setCta().onClick(async () => {
-          await this.saveAndClose();
-        });
+    const actions = new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }));
+    actions.addButton((button) => {
+      button.setButtonText("Delete").onClick(() => this.deleteSelection());
+    });
+    actions.addButton((button) => {
+      button.setButtonText("Clear").onClick(() => this.clearAnnotations());
+    });
+    actions.addButton((button) => {
+      button.setButtonText("-").onClick(() => this.setZoom(this.zoom / 1.2));
+    });
+    this.zoomLabelEl = actions.controlEl.createSpan({ cls: "skitch-layer-zoom-label", text: "100%" });
+    actions.addButton((button) => {
+      button.setButtonText("+").onClick(() => this.setZoom(this.zoom * 1.2));
+    });
+    actions.addButton((button) => {
+      button.setButtonText("Fit").onClick(() => this.fitToStage());
+    });
+    actions.addButton((button) => {
+      button.setButtonText("Save").setCta().onClick(async () => {
+        await this.saveAndClose();
       });
+    });
 
-    const stage = this.contentEl.createDiv({ cls: "skitch-layer-stage skitch-layer-fabric-stage" });
-    this.fabricCanvasEl = stage.createEl("canvas", { cls: "skitch-layer-fabric-canvas" });
+    this.stageEl = this.contentEl.createDiv({ cls: "skitch-layer-stage skitch-layer-fabric-stage" });
+    this.fabricCanvasEl = this.stageEl.createEl("canvas", { cls: "skitch-layer-fabric-canvas" });
     this.fabricCanvasEl.width = imageSize.width;
     this.fabricCanvasEl.height = imageSize.height;
 
@@ -76,12 +94,18 @@ export class AnnotationEditorModal extends Modal {
     await this.loadFabricScene(this.document, imageSize);
     this.configureTool();
     this.wireFabricEvents();
+    this.observeStageSize();
+    window.setTimeout(() => this.fitToStage(), 0);
   }
 
   onClose(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.canvas?.dispose();
     this.canvas = null;
     this.fabricCanvasEl = null;
+    this.stageEl = null;
+    this.zoomLabelEl = null;
     this.contentEl.empty();
   }
 
@@ -133,12 +157,12 @@ export class AnnotationEditorModal extends Modal {
     image.set({
       left: 0,
       top: 0,
+      scaleX: imageSize.width / Math.max(1, image.width ?? imageSize.width),
+      scaleY: imageSize.height / Math.max(1, image.height ?? imageSize.height),
       selectable: false,
       evented: false,
       skitchRole: "background"
     } as Partial<FabricObject>);
-    image.scaleToWidth(imageSize.width);
-    image.scaleToHeight(imageSize.height);
     this.canvas.add(image);
     this.canvas.sendObjectToBack(image);
   }
@@ -342,6 +366,53 @@ export class AnnotationEditorModal extends Modal {
     activeObjects.forEach((object) => this.canvas?.remove(object));
     this.canvas.discardActiveObject();
     this.canvas.renderAll();
+  }
+
+  private clearAnnotations(): void {
+    if (!this.canvas) {
+      return;
+    }
+    this.canvas.getObjects().forEach((object) => {
+      if ((object as FabricObject & { skitchRole?: string }).skitchRole !== "background") {
+        this.canvas?.remove(object);
+      }
+    });
+    this.canvas.discardActiveObject();
+    this.canvas.renderAll();
+  }
+
+  private observeStageSize(): void {
+    if (!this.stageEl) {
+      return;
+    }
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.zoom === 1) {
+        this.fitToStage();
+      }
+    });
+    this.resizeObserver.observe(this.stageEl);
+  }
+
+  private fitToStage(): void {
+    if (!this.document || !this.stageEl) {
+      return;
+    }
+    this.setZoom(calculateFitZoom(this.document.imageSize, {
+      width: this.stageEl.clientWidth,
+      height: this.stageEl.clientHeight
+    }));
+  }
+
+  private setZoom(zoom: number): void {
+    if (!this.canvas || !this.document) {
+      return;
+    }
+    this.zoom = clampZoom(zoom);
+    const width = `${Math.round(this.document.imageSize.width * this.zoom)}px`;
+    const height = `${Math.round(this.document.imageSize.height * this.zoom)}px`;
+    this.canvas.setDimensions({ width, height }, { cssOnly: true });
+    this.zoomLabelEl?.setText(formatZoomPercent(this.zoom));
+    this.canvas.requestRenderAll();
   }
 
   private async saveAndClose(): Promise<void> {
