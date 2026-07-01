@@ -1,4 +1,4 @@
-import { Canvas, Ellipse, FabricImage, Group, Line, PencilBrush, Polyline, Rect, Textbox, Triangle, type FabricObject } from "fabric";
+import { Canvas, Ellipse, Group, Line, PencilBrush, Polyline, Rect, Textbox, Triangle, type FabricObject } from "fabric";
 import { Modal, Notice, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
@@ -9,7 +9,6 @@ import {
   type Point
 } from "./annotation-model";
 import { getFabricJson, putFabricJson } from "./fabric-adapter";
-import { calculateBackgroundImageTransform } from "./fabric-background";
 import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
 import { AnnotationStorage } from "./storage";
@@ -25,6 +24,7 @@ export class AnnotationEditorModal extends Modal {
   private canvas: Canvas | null = null;
   private fabricCanvasEl: HTMLCanvasElement | null = null;
   private stageEl: HTMLDivElement | null = null;
+  private frameEl: HTMLDivElement | null = null;
   private zoomLabelEl: HTMLElement | null = null;
   private drawingStart: Point | null = null;
   private previewObject: FabricObject | null = null;
@@ -80,7 +80,16 @@ export class AnnotationEditorModal extends Modal {
     });
 
     this.stageEl = this.contentEl.createDiv({ cls: "skitch-layer-stage skitch-layer-fabric-stage" });
-    this.fabricCanvasEl = this.stageEl.createEl("canvas", { cls: "skitch-layer-fabric-canvas" });
+    this.frameEl = this.stageEl.createDiv({ cls: "skitch-layer-canvas-frame" });
+    const imageEl = this.frameEl.createEl("img", {
+      cls: "skitch-layer-editor-image",
+      attr: {
+        src: this.app.vault.getResourcePath(this.imageFile),
+        alt: this.imageFile.basename
+      }
+    });
+    imageEl.draggable = false;
+    this.fabricCanvasEl = this.frameEl.createEl("canvas", { cls: "skitch-layer-fabric-canvas" });
     this.fabricCanvasEl.width = imageSize.width;
     this.fabricCanvasEl.height = imageSize.height;
 
@@ -106,6 +115,7 @@ export class AnnotationEditorModal extends Modal {
     this.canvas = null;
     this.fabricCanvasEl = null;
     this.stageEl = null;
+    this.frameEl = null;
     this.zoomLabelEl = null;
     this.contentEl.empty();
   }
@@ -141,29 +151,12 @@ export class AnnotationEditorModal extends Modal {
 
     const fabricJson = getFabricJson(document);
     if (fabricJson) {
-      await this.canvas.loadFromJSON(fabricJson);
+      await this.canvas.loadFromJSON(stripSkitchBackgroundObjects(fabricJson) as Record<string, unknown>);
     } else {
       this.addLegacyObjects(document.objects, imageSize);
     }
 
-    await this.addBackgroundImage(imageSize);
     this.canvas.renderAll();
-  }
-
-  private async addBackgroundImage(imageSize: ImageSize): Promise<void> {
-    if (!this.canvas) {
-      return;
-    }
-    const image = await FabricImage.fromURL(this.app.vault.getResourcePath(this.imageFile));
-    const originalSize = image.getOriginalSize();
-    image.set({
-      ...calculateBackgroundImageTransform(originalSize, imageSize),
-      selectable: false,
-      evented: false,
-      skitchRole: "background"
-    } as Partial<FabricObject>);
-    this.canvas.add(image);
-    this.canvas.sendObjectToBack(image);
   }
 
   private addLegacyObjects(objects: AnnotationObject[], imageSize: ImageSize): void {
@@ -228,13 +221,8 @@ export class AnnotationEditorModal extends Modal {
     this.canvas.selection = this.tool === "select";
     this.canvas.defaultCursor = this.tool === "select" ? "default" : "crosshair";
     this.canvas.getObjects().forEach((object) => {
-      if ((object as FabricObject & { skitchRole?: string }).skitchRole === "background") {
-        object.selectable = false;
-        object.evented = false;
-      } else {
-        object.selectable = this.tool === "select";
-        object.evented = this.tool === "select";
-      }
+      object.selectable = this.tool === "select";
+      object.evented = this.tool === "select";
     });
     if (this.canvas.freeDrawingBrush) {
       this.canvas.freeDrawingBrush.color = DEFAULT_COLOR;
@@ -372,9 +360,7 @@ export class AnnotationEditorModal extends Modal {
       return;
     }
     this.canvas.getObjects().forEach((object) => {
-      if ((object as FabricObject & { skitchRole?: string }).skitchRole !== "background") {
-        this.canvas?.remove(object);
-      }
+      this.canvas?.remove(object);
     });
     this.canvas.discardActiveObject();
     this.canvas.renderAll();
@@ -409,7 +395,9 @@ export class AnnotationEditorModal extends Modal {
     this.zoom = clampZoom(zoom);
     const width = `${Math.round(this.document.imageSize.width * this.zoom)}px`;
     const height = `${Math.round(this.document.imageSize.height * this.zoom)}px`;
-    this.canvas.setDimensions({ width, height }, { cssOnly: true });
+    this.frameEl?.style.setProperty("width", width);
+    this.frameEl?.style.setProperty("height", height);
+    this.canvas.setDimensions({ width: "100%", height: "100%" }, { cssOnly: true });
     this.zoomLabelEl?.setText(formatZoomPercent(this.zoom));
     this.canvas.requestRenderAll();
   }
