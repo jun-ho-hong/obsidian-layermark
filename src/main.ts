@@ -9,6 +9,7 @@ const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp",
 
 export default class SkitchLayerPlugin extends Plugin {
   private storage!: AnnotationStorage;
+  private refreshTimer: number | null = null;
 
   async onload(): Promise<void> {
     this.storage = new AnnotationStorage(this.app);
@@ -32,6 +33,12 @@ export default class SkitchLayerPlugin extends Plugin {
       });
     });
 
+    this.registerDomEvent(document, "contextmenu", (event: MouseEvent) => {
+      this.openAnnotatedImageContextMenu(event).catch((error) => {
+        console.warn("Skitch Layer failed to open annotated image menu", error);
+      });
+    });
+
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu: Menu, file) => {
         if (file instanceof TFile && this.isSupportedImage(file)) {
@@ -46,8 +53,25 @@ export default class SkitchLayerPlugin extends Plugin {
     );
 
     this.app.workspace.onLayoutReady(() => {
-      this.refreshAllVisibleAnnotations().catch((error) => console.warn("Skitch Layer failed to refresh annotations", error));
+      this.scheduleRefreshVisibleAnnotations();
+      window.setTimeout(() => this.scheduleRefreshVisibleAnnotations(), 750);
+      window.setTimeout(() => this.scheduleRefreshVisibleAnnotations(), 2000);
     });
+
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.scheduleRefreshVisibleAnnotations()));
+    this.registerEvent(this.app.vault.on("modify", (file) => {
+      if (file instanceof TFile && file.path.endsWith(".skitch.json")) {
+        this.scheduleRefreshVisibleAnnotations();
+      }
+    }));
+
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some((mutation) => this.mutationMayContainImage(mutation))) {
+        this.scheduleRefreshVisibleAnnotations();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    this.register(() => observer.disconnect());
   }
 
   private async promptForImagePath(): Promise<void> {
@@ -111,6 +135,18 @@ export default class SkitchLayerPlugin extends Plugin {
     }
   }
 
+  private scheduleRefreshVisibleAnnotations(): void {
+    if (this.refreshTimer !== null) {
+      window.clearTimeout(this.refreshTimer);
+    }
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = null;
+      this.refreshAllVisibleAnnotations().catch((error) => {
+        console.warn("Skitch Layer failed to refresh annotations", error);
+      });
+    }, 150);
+  }
+
   private async refreshVisibleAnnotations(annotation: AnnotationDocument): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     const images = Array.from(document.querySelectorAll<HTMLImageElement>(".workspace-leaf-content img"));
@@ -164,6 +200,52 @@ export default class SkitchLayerPlugin extends Plugin {
     new Notice("Annotated image copied");
   }
 
+  private async openAnnotatedImageContextMenu(event: MouseEvent): Promise<void> {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const wrapper = target?.closest<HTMLElement>(".skitch-layer-wrapper");
+    if (!wrapper) {
+      return;
+    }
+    const image = wrapper.querySelector<HTMLImageElement>("img");
+    const imagePath = wrapper.dataset.skitchImagePath;
+    if (!image || !imagePath) {
+      return;
+    }
+    const annotation = await this.storage.load(imagePath);
+    if (!annotation || annotation.objects.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const menu = new Menu();
+    menu.addItem((item) => {
+      item
+        .setTitle("Copy annotated image")
+        .setIcon("copy")
+        .onClick(async () => {
+          try {
+            await copyAnnotatedImageToClipboard(image, annotation);
+            new Notice("Annotated image copied");
+          } catch (error) {
+            console.warn("Skitch Layer failed to copy annotated image", error);
+            new Notice(error instanceof Error ? error.message : "Unable to copy annotated image");
+          }
+        });
+    });
+    menu.addItem((item) => {
+      item
+        .setTitle("Annotate image")
+        .setIcon("pencil")
+        .onClick(() => {
+          const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+          if (file instanceof TFile) {
+            this.openEditor(file);
+          }
+        });
+    });
+    menu.showAtMouseEvent(event);
+  }
+
   private findCopyTargetWrapper(event: ClipboardEvent): HTMLElement | null {
     const selection = document.getSelection();
     if (selection && selection.rangeCount > 0) {
@@ -215,7 +297,10 @@ export default class SkitchLayerPlugin extends Plugin {
   private imageLooksLikeAnnotationTarget(image: HTMLImageElement, annotation: AnnotationDocument): boolean {
     const filename = annotation.imagePath.split("/").pop() ?? annotation.imagePath;
     const decodedSource = this.normalizeUrlForCompare(image.src);
-    return image.alt === filename || image.alt === annotation.imagePath || decodedSource.includes(filename) || decodedSource.includes(annotation.imagePath);
+    if (image.alt === filename || image.alt === annotation.imagePath || decodedSource.includes(filename) || decodedSource.includes(annotation.imagePath)) {
+      return true;
+    }
+    return image.naturalWidth === annotation.imageSize.width && image.naturalHeight === annotation.imageSize.height;
   }
 
   private findImageFileByResourceSrc(src: string): TFile | null {
@@ -240,5 +325,17 @@ export default class SkitchLayerPlugin extends Plugin {
 
   private isSupportedImage(file: TFile): boolean {
     return SUPPORTED_IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
+  }
+
+  private mutationMayContainImage(mutation: MutationRecord): boolean {
+    for (const node of Array.from(mutation.addedNodes)) {
+      if (!(node instanceof HTMLElement)) {
+        continue;
+      }
+      if (node.tagName === "IMG" || node.querySelector("img")) {
+        return true;
+      }
+    }
+    return false;
   }
 }
