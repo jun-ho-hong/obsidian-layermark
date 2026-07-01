@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextBadgeNumber, normalizeFontSize, normalizeStrokeWidth, toolFromShortcut } from "../src/editor-tools";
+import { createArrowPathData, nextBadgeNumber, normalizeFontSize, normalizeStrokeWidth, toolFromShortcut } from "../src/editor-tools";
 
 describe("editor tools", () => {
   it("maps keyboard shortcuts to tools", () => {
@@ -22,5 +22,14 @@ describe("editor tools", () => {
     expect(normalizeStrokeWidth(99)).toBe(32);
     expect(normalizeFontSize(2)).toBe(8);
     expect(normalizeFontSize(999)).toBe(144);
+  });
+
+  it("creates a single serializable path for arrows", () => {
+    const path = createArrowPathData({ x: 10, y: 20 }, { x: 110, y: 20 }, 8);
+
+    expect(path).toContain("M 10 20 L 110 20");
+    expect(path.split(" M ")).toHaveLength(2);
+    expect(path).not.toContain("undefined");
+    expect(path).not.toContain("NaN");
   });
 });

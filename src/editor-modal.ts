@@ -1,4 +1,4 @@
-import { Canvas, Ellipse, Group, Line, PencilBrush, Polyline, Rect, Textbox, Triangle, type FabricObject } from "fabric";
+import { Canvas, Circle, Ellipse, Path, PencilBrush, Polyline, Rect, Textbox, type FabricObject } from "fabric";
 import { Modal, Notice, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
@@ -12,6 +12,7 @@ import { getFabricJson, putFabricJson } from "./fabric-adapter";
 import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import {
   DEFAULT_STYLE,
+  createArrowPathData,
   nextBadgeNumber,
   normalizeFontSize,
   normalizeStrokeWidth,
@@ -452,35 +453,46 @@ export class AnnotationEditorModal extends Modal {
     }
     const radius = Math.max(14, this.style.fontSize * 0.58);
     const number = this.settings.nextBadgeNumber;
-    const circle = new Ellipse({
-      left: -radius,
-      top: -radius,
-      rx: radius,
-      ry: radius,
+    const badgeId = `badge-${Date.now()}-${number}`;
+    const circle = new Circle({
+      left: point.x - radius,
+      top: point.y - radius,
+      radius,
       fill: this.style.color,
       stroke: "#ffffff",
-      strokeWidth: Math.max(2, Math.round(this.style.strokeWidth / 3))
-    });
+      strokeWidth: Math.max(2, Math.round(this.style.strokeWidth / 3)),
+      skitchKind: "badge",
+      skitchBadgeId: badgeId,
+      skitchBadgePart: "shape"
+    } as Partial<Circle>);
+    const labelSize = radius * 2;
     const label = new Textbox(String(number), {
-      left: -radius,
-      top: -this.style.fontSize / 2,
-      width: radius * 2,
+      left: point.x - radius,
+      top: point.y - this.style.fontSize * 0.58,
+      width: labelSize,
+      height: labelSize,
       fill: "#ffffff",
       fontSize: this.style.fontSize,
       fontWeight: "700",
       textAlign: "center",
-      fontFamily: "var(--font-interface, sans-serif)"
+      fontFamily: "var(--font-interface, sans-serif)",
+      selectable: true,
+      evented: true,
+      skitchKind: "badge",
+      skitchBadgeId: badgeId,
+      skitchBadgePart: "label"
+    } as Partial<Textbox>);
+    circle.on("moving", () => {
+      label.set({
+        left: Number(circle.left) + radius - labelSize / 2,
+        top: Number(circle.top) + radius - this.style.fontSize * 0.58
+      });
     });
-    const badge = new Group([circle, label], {
-      left: point.x,
-      top: point.y,
-      originX: "center",
-      originY: "center",
-      skitchKind: "badge"
-    } as Partial<FabricObject>);
-    applySelectionControls(badge);
-    this.canvas.add(badge);
-    this.canvas.setActiveObject(badge);
+    applySelectionControls(circle);
+    applySelectionControls(label);
+    this.canvas.add(circle);
+    this.canvas.add(label);
+    this.canvas.setActiveObject(circle);
     this.settings.nextBadgeNumber = nextBadgeNumber(number);
     this.setTool("select");
     this.configureTool();
@@ -627,33 +639,19 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return {};
     }
+    sanitizeCanvasObjects(this.canvas);
     const toJsonWithProperties = this.canvas.toJSON as unknown as (propertiesToInclude?: string[]) => unknown;
-    return stripSkitchBackgroundObjects(toJsonWithProperties(["skitchRole"]));
+    return stripSkitchBackgroundObjects(toJsonWithProperties(["skitchRole", "skitchKind", "skitchBadgeId", "skitchBadgePart"]));
   }
 }
 
 function createArrow(start: Point, end: Point, color: string, strokeWidth: number): FabricObject {
-  const angle = (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI + 90;
-  const line = new Line([start.x, start.y, end.x, end.y], {
+  return withControls(new Path(createArrowPathData(start, end, strokeWidth), {
+    fill: "",
     stroke: color,
     strokeWidth,
     strokeLineCap: "round",
-    selectable: false,
-    evented: false
-  });
-  const head = new Triangle({
-    left: end.x,
-    top: end.y,
-    originX: "center",
-    originY: "center",
-    width: strokeWidth * 4,
-    height: strokeWidth * 5,
-    fill: color,
-    angle,
-    selectable: false,
-    evented: false
-  });
-  return withControls(new Group([line, head], {
+    strokeLineJoin: "round",
     selectable: true,
     evented: true
   }));
@@ -678,7 +676,9 @@ function applySelectionControls(object: FabricObject): void {
 }
 
 function applyStyleToObject(object: FabricObject, style: AnnotationStyleState): void {
-  const childObjects = "getObjects" in object ? (object as Group).getObjects() : [];
+  const childObjects = typeof (object as { getObjects?: unknown }).getObjects === "function"
+    ? ((object as unknown as { getObjects: () => FabricObject[] }).getObjects() ?? []).filter(Boolean)
+    : [];
   if (childObjects.length > 0) {
     for (const child of childObjects) {
       applyStyleToObject(child, style);
@@ -704,6 +704,24 @@ function applyStyleToObject(object: FabricObject, style: AnnotationStyleState): 
     stroke: style.color,
     strokeWidth: style.strokeWidth
   } as Partial<FabricObject>);
+}
+
+function sanitizeCanvasObjects(canvas: Canvas): void {
+  const objects = canvas.getObjects();
+  for (const object of objects) {
+    if (!object || typeof object.toObject !== "function") {
+      canvas.remove(object);
+      continue;
+    }
+    const childProvider = (object as { getObjects?: unknown }).getObjects;
+    if (typeof childProvider !== "function") {
+      continue;
+    }
+    const children = (object as unknown as { getObjects: () => FabricObject[] }).getObjects() ?? [];
+    if (children.some((child) => !child || typeof child.toObject !== "function")) {
+      canvas.remove(object);
+    }
+  }
 }
 
 function toolLabel(tool: EditorTool): string {

@@ -38,3 +38,44 @@ export function normalizeStrokeWidth(value: number): number {
 export function normalizeFontSize(value: number): number {
   return Math.min(144, Math.max(8, Math.round(value)));
 }
+
+export type ArrowPathPoint = {
+  x: number;
+  y: number;
+};
+
+export function createArrowPathData(start: ArrowPathPoint, end: ArrowPathPoint, strokeWidth: number): string {
+  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  const headLength = Math.max(14, normalizeStrokeWidth(strokeWidth) * 4.5);
+  const headAngle = Math.PI / 7;
+  const left = {
+    x: end.x - headLength * Math.cos(angle - headAngle),
+    y: end.y - headLength * Math.sin(angle - headAngle)
+  };
+  const right = {
+    x: end.x - headLength * Math.cos(angle + headAngle),
+    y: end.y - headLength * Math.sin(angle + headAngle)
+  };
+
+  return [
+    "M",
+    roundPathNumber(start.x),
+    roundPathNumber(start.y),
+    "L",
+    roundPathNumber(end.x),
+    roundPathNumber(end.y),
+    "M",
+    roundPathNumber(left.x),
+    roundPathNumber(left.y),
+    "L",
+    roundPathNumber(end.x),
+    roundPathNumber(end.y),
+    "L",
+    roundPathNumber(right.x),
+    roundPathNumber(right.y)
+  ].join(" ");
+}
+
+function roundPathNumber(value: number): string {
+  return String(Math.round(value * 1000) / 1000);
+}
