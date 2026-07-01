@@ -9,6 +9,7 @@ import {
   type Point
 } from "./annotation-model";
 import { getFabricJson, putFabricJson } from "./fabric-adapter";
+import { calculateBackgroundImageTransform } from "./fabric-background";
 import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
 import { AnnotationStorage } from "./storage";
@@ -154,11 +155,9 @@ export class AnnotationEditorModal extends Modal {
       return;
     }
     const image = await FabricImage.fromURL(this.app.vault.getResourcePath(this.imageFile));
+    const originalSize = image.getOriginalSize();
     image.set({
-      left: 0,
-      top: 0,
-      scaleX: imageSize.width / Math.max(1, image.width ?? imageSize.width),
-      scaleY: imageSize.height / Math.max(1, image.height ?? imageSize.height),
+      ...calculateBackgroundImageTransform(originalSize, imageSize),
       selectable: false,
       evented: false,
       skitchRole: "background"

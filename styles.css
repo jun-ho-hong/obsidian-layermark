@@ -105,14 +105,7 @@
   min-height: 360px;
   overflow: auto;
   margin-top: 14px;
-  background:
-    linear-gradient(45deg, var(--background-secondary) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--background-secondary) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--background-secondary) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--background-secondary) 75%),
-    var(--background-primary);
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
-  background-size: 20px 20px;
+  background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   position: relative;
