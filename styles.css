@@ -41,9 +41,9 @@
 
 .skitch-layer-toolbar {
   display: grid;
-  grid-template-columns: minmax(96px, 180px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(80px, 180px) minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: center;
+  align-items: start;
   padding: 12px 4px 16px;
   border-bottom: 1px solid var(--background-modifier-border);
   position: relative;
@@ -64,9 +64,9 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   margin: 0;
   padding: 6px;
   border: 1px solid var(--background-modifier-border);
@@ -79,6 +79,8 @@
   display: flex;
   gap: 1px;
   align-items: stretch;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
 }
 
 .skitch-layer-tool-group button {
@@ -87,9 +89,9 @@
   gap: 3px;
   align-items: center;
   justify-content: center;
-  min-width: 54px;
-  height: 48px;
-  padding: 4px 6px;
+  min-width: 48px;
+  height: 46px;
+  padding: 4px 5px;
   border: 0;
   border-radius: 7px;
   box-shadow: none;
@@ -117,15 +119,17 @@
 
 .skitch-layer-style-controls {
   display: flex;
-  gap: 7px;
+  gap: 6px;
   align-items: center;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
   padding-left: 8px;
   border-left: 1px solid var(--background-modifier-border);
 }
 
 .skitch-layer-color-input {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   padding: 2px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
@@ -134,14 +138,14 @@
 
 .skitch-layer-color-presets {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   align-items: center;
 }
 
 .skitch-layer-color-swatch {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
   padding: 0;
   border: 1px solid rgba(127, 127, 127, 0.45);
   border-radius: 999px;
@@ -149,7 +153,7 @@
 }
 
 .skitch-layer-width-input {
-  width: 82px;
+  width: 72px;
 }
 
 .skitch-layer-font-size-input {
@@ -159,7 +163,7 @@
 }
 
 .skitch-layer-font-family-input {
-  width: 72px;
+  width: 66px;
   height: 30px;
   font-size: 12px;
 }
@@ -181,6 +185,7 @@
   min-width: max-content;
   margin-left: 0;
   border: 0;
+  align-self: start;
 }
 
 .skitch-layer-actions .setting-item {
