@@ -1,5 +1,12 @@
 import type { AnnotationDocument } from "./annotation-model";
+import { getFabricJson } from "./fabric-adapter";
+import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import { createPreviewSvg, loadImage, svgMarkupToPngBlob } from "./preview-generator";
+
+type FabricJson = {
+  objects?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
 
 export function createFlattenedSvgMarkup(document: AnnotationDocument, imageHref: string): string {
   return createPreviewSvg(document, imageHref);
@@ -10,10 +17,21 @@ export async function copyAnnotatedImageToClipboard(image: HTMLImageElement, ann
     throw new Error("Clipboard image writing is not available in this Obsidian environment.");
   }
 
+  const blob = hasFabricObjects(annotation)
+    ? await createFabricPreviewPngBlob(annotation, image.src)
+    : await createLegacyAnnotationPngBlob(image, annotation);
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
+async function createLegacyAnnotationPngBlob(image: HTMLImageElement, annotation: AnnotationDocument): Promise<Blob> {
   const imageDataUrl = await imageElementToDataUrl(image, annotation);
   const svgMarkup = createFlattenedSvgMarkup(annotation, imageDataUrl);
-  const blob = await svgMarkupToPngBlob(svgMarkup, annotation.imageSize.width, annotation.imageSize.height);
-  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+  return svgMarkupToPngBlob(svgMarkup, annotation.imageSize.width, annotation.imageSize.height);
+}
+
+function hasFabricObjects(annotation: AnnotationDocument): boolean {
+  const fabricJson = stripSkitchBackgroundObjects(getFabricJson(annotation));
+  return isFabricJson(fabricJson) && Boolean(fabricJson.objects?.length);
 }
 
 async function imageElementToDataUrl(image: HTMLImageElement, annotation: AnnotationDocument): Promise<string> {
@@ -28,4 +46,8 @@ async function imageElementToDataUrl(image: HTMLImageElement, annotation: Annota
   const loadedImage = await loadImage(image.src);
   context.drawImage(loadedImage, 0, 0, annotation.imageSize.width, annotation.imageSize.height);
   return canvas.toDataURL("image/png");
+}
+
+function isFabricJson(value: unknown): value is FabricJson {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
