@@ -1,4 +1,4 @@
-export type EditorTool = "select" | "arrow" | "pen" | "rectangle" | "ellipse" | "text" | "badge";
+export type EditorTool = "select" | "pen" | "text" | "highlight" | "rectangle" | "ellipse" | "arrow" | "badge";
 
 export type AnnotationStyleState = {
   color: string;
@@ -15,11 +15,12 @@ export const DEFAULT_STYLE: AnnotationStyleState = {
 const TOOL_SHORTCUTS: Record<string, EditorTool> = {
   v: "select",
   s: "select",
-  a: "arrow",
   p: "pen",
+  t: "text",
+  h: "highlight",
   r: "rectangle",
   e: "ellipse",
-  t: "text",
+  a: "arrow",
   b: "badge"
 };
 

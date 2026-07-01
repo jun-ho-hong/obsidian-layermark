@@ -35,8 +35,9 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 12px 4px 14px;
+  padding: 12px 4px 16px;
   border-bottom: 1px solid var(--background-modifier-border);
+  position: relative;
 }
 
 .skitch-layer-toolbar-title {
@@ -50,23 +51,51 @@
   white-space: nowrap;
 }
 
+.skitch-layer-tool-palette {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 auto;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
 .skitch-layer-tool-group {
   display: flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: var(--background-secondary);
+  gap: 1px;
+  align-items: stretch;
 }
 
 .skitch-layer-tool-group button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
   min-width: 54px;
-  height: 32px;
+  height: 48px;
+  padding: 4px 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   box-shadow: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.skitch-layer-tool-icon {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.skitch-layer-tool-label {
+  white-space: nowrap;
 }
 
 .skitch-layer-tool-group button.is-active {
@@ -76,29 +105,28 @@
 
 .skitch-layer-style-controls {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  padding: 3px 8px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: var(--background-secondary);
+  padding-left: 8px;
+  border-left: 1px solid var(--background-modifier-border);
 }
 
 .skitch-layer-color-input {
-  width: 32px;
-  height: 28px;
-  padding: 0;
-  border: 0;
+  width: 34px;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
   background: transparent;
 }
 
 .skitch-layer-width-input {
-  width: 86px;
+  width: 82px;
 }
 
 .skitch-layer-font-size-input {
-  width: 54px;
-  height: 28px;
+  width: 50px;
+  height: 30px;
   font-size: 12px;
 }
 
@@ -133,7 +161,7 @@
   min-height: 360px;
   overflow: auto;
   margin-top: 14px;
-  background: var(--background-secondary);
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   position: relative;
@@ -161,9 +189,9 @@
 
 .skitch-layer-fabric-stage {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 24px;
 }
 
 .skitch-layer-fabric-stage .canvas-container {

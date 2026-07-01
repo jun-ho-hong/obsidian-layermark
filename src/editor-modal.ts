@@ -1,5 +1,5 @@
 import { Canvas, Circle, Ellipse, Path, PencilBrush, Polyline, Rect, Textbox, type FabricObject } from "fabric";
-import { Modal, Notice, Setting, TFile, type App } from "obsidian";
+import { Modal, Notice, setIcon, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
   normalizePoint,
@@ -21,6 +21,7 @@ import {
   type EditorTool
 } from "./editor-tools";
 import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
+import { serializeFabricScene } from "./fabric-serialization";
 import type { SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
@@ -66,15 +67,17 @@ export class AnnotationEditorModal extends Modal {
 
     const toolbar = this.contentEl.createDiv({ cls: "skitch-layer-toolbar" });
     toolbar.createDiv({ cls: "skitch-layer-toolbar-title", text: this.imageFile.name });
-    this.toolGroupEl = toolbar.createDiv({ cls: "skitch-layer-tool-group" });
-    this.addToolButton(this.toolGroupEl, "select", "Select");
-    this.addToolButton(this.toolGroupEl, "arrow", "Arrow");
-    this.addToolButton(this.toolGroupEl, "pen", "Pen");
-    this.addToolButton(this.toolGroupEl, "rectangle", "Rect");
-    this.addToolButton(this.toolGroupEl, "ellipse", "Ellipse");
-    this.addToolButton(this.toolGroupEl, "text", "Text");
-    this.addToolButton(this.toolGroupEl, "badge", "Badge");
-    this.addStyleControls(toolbar.createDiv({ cls: "skitch-layer-style-controls" }));
+    const palette = toolbar.createDiv({ cls: "skitch-layer-tool-palette" });
+    this.toolGroupEl = palette.createDiv({ cls: "skitch-layer-tool-group" });
+    this.addToolButton(this.toolGroupEl, "select", "선택", "mouse-pointer-2", "V");
+    this.addToolButton(this.toolGroupEl, "pen", "펜", "pen-line", "P");
+    this.addToolButton(this.toolGroupEl, "text", "텍스트", "type", "T");
+    this.addToolButton(this.toolGroupEl, "highlight", "강조표시", "highlighter", "H");
+    this.addToolButton(this.toolGroupEl, "rectangle", "사각형", "square", "R");
+    this.addToolButton(this.toolGroupEl, "ellipse", "원", "circle", "E");
+    this.addToolButton(this.toolGroupEl, "arrow", "화살표", "arrow-up-right", "A");
+    this.addToolButton(this.toolGroupEl, "badge", "배지", "badge-check", "B");
+    this.addStyleControls(palette.createDiv({ cls: "skitch-layer-style-controls" }));
     const actions = new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }));
     actions.addButton((button) => {
       button.setButtonText("Delete").onClick(() => this.deleteSelection());
@@ -145,9 +148,14 @@ export class AnnotationEditorModal extends Modal {
     this.contentEl.empty();
   }
 
-  private addToolButton(toolbar: HTMLElement, tool: EditorTool, label: string): void {
-    const button = toolbar.createEl("button", { text: label, cls: "clickable-icon" });
+  private addToolButton(toolbar: HTMLElement, tool: EditorTool, label: string, icon: string, shortcut: string): void {
+    const button = toolbar.createEl("button", { cls: "skitch-layer-tool-button clickable-icon" });
     button.type = "button";
+    button.dataset.tool = tool;
+    button.title = `${label} (${shortcut})`;
+    const iconEl = button.createSpan({ cls: "skitch-layer-tool-icon" });
+    setIcon(iconEl, icon);
+    button.createSpan({ cls: "skitch-layer-tool-label", text: label });
     button.addEventListener("click", () => {
       this.setTool(tool);
     });
@@ -199,7 +207,7 @@ export class AnnotationEditorModal extends Modal {
   private setTool(tool: EditorTool): void {
     this.tool = tool;
     this.toolGroupEl?.querySelectorAll("button").forEach((candidate) => {
-      candidate.toggleClass("is-active", candidate.textContent?.toLowerCase() === toolLabel(tool).toLowerCase());
+      candidate.toggleClass("is-active", candidate.dataset.tool === tool);
     });
     this.configureTool();
   }
@@ -312,6 +320,14 @@ export class AnnotationEditorModal extends Modal {
     }
     this.canvas.on("selection:created", () => this.syncStyleFromSelection());
     this.canvas.on("selection:updated", () => this.syncStyleFromSelection());
+    this.canvas.on("mouse:dblclick", (event) => {
+      const target = event.target;
+      if (target && (target.type === "textbox" || target.type === "i-text" || target.type === "text")) {
+        this.canvas?.setActiveObject(target);
+        (target as Textbox).enterEditing();
+        (target as Textbox).selectAll();
+      }
+    });
     this.canvas.on("mouse:down", (event) => {
       if (!this.canvas || this.tool === "select" || this.tool === "pen") {
         return;
@@ -357,7 +373,7 @@ export class AnnotationEditorModal extends Modal {
       this.saveAndClose().catch((error) => this.showSaveError(error));
       return false;
     });
-    for (const key of ["v", "s", "a", "p", "r", "e", "t", "b"]) {
+    for (const key of ["v", "s", "p", "t", "h", "r", "e", "a", "b"]) {
       this.scope.register([], key, () => {
         const tool = toolFromShortcut(key);
         if (tool) {
@@ -523,6 +539,18 @@ export class AnnotationEditorModal extends Modal {
         fill: "transparent"
       }));
     }
+    if (this.tool === "highlight") {
+      return withControls(new Rect({
+        left: Math.min(startPoint.x, endPoint.x),
+        top: Math.min(startPoint.y, endPoint.y),
+        width: Math.abs(width),
+        height: Math.abs(height),
+        stroke: "rgba(0,0,0,0)",
+        strokeWidth: 0,
+        fill: colorWithAlpha(this.style.color, 0.32),
+        skitchKind: "highlight"
+      } as Partial<Rect>));
+    }
     if (this.tool === "ellipse") {
       return withControls(new Ellipse({
         left: Math.min(startPoint.x, endPoint.x),
@@ -619,9 +647,7 @@ export class AnnotationEditorModal extends Modal {
       const fabricJson = this.getAnnotationOnlyFabricJson();
       this.document = putFabricJson({ ...this.document, objects: [] }, fabricJson);
       await this.storage.save(this.document);
-      const previewBlob = await createFabricPreviewPngBlob(this.document, this.app.vault.getResourcePath(this.imageFile));
-      const previewBytes = await previewBlob.arrayBuffer();
-      await this.storage.savePreview(this.document.imagePath, previewBytes);
+      await this.savePreviewBestEffort(this.document);
       await this.onSave?.(this.document, this.settings);
       new Notice("Annotation saved");
       this.close();
@@ -635,13 +661,23 @@ export class AnnotationEditorModal extends Modal {
     new Notice(error instanceof Error ? `Skitch save failed: ${error.message}` : "Skitch save failed");
   }
 
+  private async savePreviewBestEffort(document: AnnotationDocument): Promise<void> {
+    try {
+      const previewBlob = await createFabricPreviewPngBlob(document, this.app.vault.getResourcePath(this.imageFile));
+      const previewBytes = await previewBlob.arrayBuffer();
+      await this.storage.savePreview(document.imagePath, previewBytes);
+    } catch (error) {
+      console.warn("Skitch Layer saved annotation data but failed to render preview PNG", error);
+      new Notice("Annotation saved. Preview will refresh with overlay rendering.");
+    }
+  }
+
   private getAnnotationOnlyFabricJson(): unknown {
     if (!this.canvas) {
       return {};
     }
     sanitizeCanvasObjects(this.canvas);
-    const toJsonWithProperties = this.canvas.toJSON as unknown as (propertiesToInclude?: string[]) => unknown;
-    return stripSkitchBackgroundObjects(toJsonWithProperties(["skitchRole", "skitchKind", "skitchBadgeId", "skitchBadgePart"]));
+    return serializeFabricScene(this.canvas.getObjects());
   }
 }
 
@@ -695,7 +731,12 @@ function applyStyleToObject(object: FabricObject, style: AnnotationStyleState): 
     return;
   }
 
-  if (object.type === "ellipse" && object.get("fill") !== "transparent") {
+  const fill = String(object.get("fill") ?? "");
+  if (object.get("skitchKind") === "highlight") {
+    object.set({ fill: colorWithAlpha(style.color, 0.32) } as Partial<FabricObject>);
+    return;
+  }
+  if ((object.type === "ellipse" || object.type === "circle" || object.type === "rect") && fill && fill !== "transparent") {
     object.set({ fill: style.color } as Partial<FabricObject>);
     return;
   }
@@ -727,18 +768,33 @@ function sanitizeCanvasObjects(canvas: Canvas): void {
 function toolLabel(tool: EditorTool): string {
   switch (tool) {
     case "select":
-      return "Select";
-    case "arrow":
-      return "Arrow";
+      return "선택";
     case "pen":
-      return "Pen";
-    case "rectangle":
-      return "Rect";
-    case "ellipse":
-      return "Ellipse";
+      return "펜";
     case "text":
-      return "Text";
+      return "텍스트";
+    case "highlight":
+      return "강조표시";
+    case "rectangle":
+      return "사각형";
+    case "ellipse":
+      return "원";
+    case "arrow":
+      return "화살표";
     case "badge":
-      return "Badge";
+      return "배지";
   }
+}
+
+function colorWithAlpha(color: string, alpha: number): string {
+  if (!color.startsWith("#") || (color.length !== 7 && color.length !== 4)) {
+    return color;
+  }
+  const expanded = color.length === 4
+    ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+    : color;
+  const red = Number.parseInt(expanded.slice(1, 3), 16);
+  const green = Number.parseInt(expanded.slice(3, 5), 16);
+  const blue = Number.parseInt(expanded.slice(5, 7), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }

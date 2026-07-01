@@ -4,11 +4,12 @@ import { createArrowPathData, nextBadgeNumber, normalizeFontSize, normalizeStrok
 describe("editor tools", () => {
   it("maps keyboard shortcuts to tools", () => {
     expect(toolFromShortcut("v")).toBe("select");
-    expect(toolFromShortcut("a")).toBe("arrow");
     expect(toolFromShortcut("P")).toBe("pen");
+    expect(toolFromShortcut("t")).toBe("text");
+    expect(toolFromShortcut("h")).toBe("highlight");
     expect(toolFromShortcut("r")).toBe("rectangle");
     expect(toolFromShortcut("e")).toBe("ellipse");
-    expect(toolFromShortcut("t")).toBe("text");
+    expect(toolFromShortcut("a")).toBe("arrow");
     expect(toolFromShortcut("b")).toBe("badge");
   });
 
