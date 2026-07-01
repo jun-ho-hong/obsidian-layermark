@@ -1,0 +1,62 @@
+﻿.skitch-layer-wrapper {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.skitch-layer-wrapper > img {
+  display: block;
+}
+
+.skitch-layer-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.skitch-layer-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: min(88vh, 920px);
+}
+
+.skitch-layer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.skitch-layer-stage {
+  flex: 1;
+  min-height: 360px;
+  overflow: auto;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  position: relative;
+}
+
+.skitch-layer-stage-inner {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.skitch-layer-stage-inner img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.skitch-layer-drawing-surface {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}

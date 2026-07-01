@@ -1,0 +1,10 @@
+﻿{
+  "id": "skitch-layer",
+  "name": "Skitch Layer",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Non-destructive Skitch-style image annotations for Obsidian images.",
+  "author": "",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

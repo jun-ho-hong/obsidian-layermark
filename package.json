@@ -1,0 +1,28 @@
+﻿{
+  "name": "obsidian-skitch-layer",
+  "version": "0.1.0",
+  "description": "Non-destructive Skitch-style image annotations for Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "image-annotation",
+    "skitch"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "latest",
+    "builtin-modules": "latest",
+    "esbuild": "latest",
+    "obsidian": "latest",
+    "tslib": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
