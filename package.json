@@ -14,7 +14,7 @@
     "image-annotation",
     "skitch"
   ],
-  "author": "",
+  "author": "Jun Ho Hong",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "latest",

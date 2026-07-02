@@ -29,7 +29,12 @@ export function hasFabricOverlay(document: AnnotationDocument): boolean {
   return isFabricJson(fabricJson) && Boolean(fabricJson.objects?.length);
 }
 
-export async function attachFabricOverlay(container: HTMLElement, document: AnnotationDocument): Promise<HTMLCanvasElement> {
+export type FabricOverlayHandle = {
+  element: HTMLCanvasElement;
+  dispose: () => Promise<void>;
+};
+
+export async function attachFabricOverlay(container: HTMLElement, document: AnnotationDocument): Promise<FabricOverlayHandle> {
   const fabricJson = stripSkitchBackgroundObjects(getFabricJson(document));
   if (!isFabricJson(fabricJson)) {
     throw new Error("Unable to render Fabric annotation overlay.");
@@ -48,7 +53,12 @@ export async function attachFabricOverlay(container: HTMLElement, document: Anno
   });
   await canvas.loadFromJSON(fabricJson);
   canvas.renderAll();
-  return canvasElement;
+  return {
+    element: canvasElement,
+    dispose: async () => {
+      await canvas.dispose();
+    }
+  };
 }
 
 function renderAnnotation(annotation: AnnotationObject, imageSize: AnnotationDocument["imageSize"]): string {

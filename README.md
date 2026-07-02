@@ -1,26 +1,29 @@
-﻿# Skitch Layer
+# Skitch Layer
 
-Skitch Layer is an Obsidian plugin prototype for non-destructive image annotations inspired by Evernote/Skitch.
+Skitch Layer adds non-destructive, Skitch-style image annotations to Obsidian.
 
-## What it does
+It keeps the original image file unchanged, stores editable annotation data in a sidecar JSON file, and renders an annotated view in notes when the plugin is enabled.
 
-- Keeps the original image file unchanged.
-- Stores editable annotation vectors in a sidecar JSON file next to the image.
-- Uses normal Obsidian image embeds, so notes still render without this plugin.
-- Overlays saved annotations in Reading Mode.
-- Provides a first-pass editor for arrows, pen strokes, rectangles, ellipses, and text.
+## Features
+
+- Non-destructive annotations for normal Obsidian image embeds.
+- Editable sidecar data stored next to the source image as `<image>.skitch.json`.
+- Generated preview image stored as `<image>.skitch.png` for copy/export workflows.
+- Tools for select, pen, text, highlight, rectangle, ellipse, arrow, and numbered badges.
+- Reading mode rendering with flattened preview fallback and editable source data.
+- Context menu actions for annotating, copying the annotated image, and clearing annotations.
 
 ## Fallback behavior
 
-A note can keep a normal embed:
+Notes keep normal Obsidian image embeds:
 
 ```md
 ![[example.png]]
 ```
 
-When the plugin is installed and `example.png.skitch.json` exists, Skitch Layer draws the annotation overlay. If the plugin is missing, disabled, or the sidecar JSON fails to sync, Obsidian still shows `example.png` normally.
+If the plugin is missing, disabled, or the sidecar file has not synced yet, Obsidian still displays the original image. The annotations are an additive layer, not a destructive edit to the source image.
 
-## Sidecar format
+## Sidecar files
 
 For an image at:
 
@@ -28,15 +31,16 @@ For an image at:
 Attachments/example.png
 ```
 
-annotations are stored at:
+Skitch Layer stores:
 
 ```text
 Attachments/example.png.skitch.json
+Attachments/example.png.skitch.png
 ```
 
-Coordinates are normalized from `0` to `1`, so annotations keep their positions when the image is displayed at different sizes.
+The JSON file is the editable source of truth. The PNG file is a generated preview for display and clipboard workflows.
 
-## Install for local testing
+## Local installation
 
 1. Run `npm install`.
 2. Run `npm run build`.
@@ -48,16 +52,13 @@ Coordinates are normalized from `0` to `1`, so annotations keep their positions 
 
 4. Enable `Skitch Layer` in Obsidian community plugins.
 
-## Current limitations
-
-- The editor is an MVP, not a polished Skitch clone yet.
-- Reading Mode overlay is implemented first; Live Preview support needs more work.
-- Existing annotations render, but object selection/resizing is not implemented yet.
-- Text input currently uses a simple prompt.
-
 ## Development
 
 ```bash
 npm test
 npm run build
 ```
+
+## Current production hardening status
+
+The plugin is under active hardening before community plugin submission. The core model is usable, but broader manual QA is still needed for Live Preview, mobile, large vaults, duplicate filenames, sync conflicts, rename/delete flows, and plugin enable/disable cycles.

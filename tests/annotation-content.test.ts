@@ -20,6 +20,15 @@ describe("annotation content detection", () => {
     ).toBe(true);
   });
 
+  it("does not treat empty Fabric editor JSON as annotation content", () => {
+    expect(
+      hasAnnotationContent({
+        ...baseDocument,
+        engine: { fabricJson: { objects: [] } }
+      })
+    ).toBe(false);
+  });
+
   it("does not treat an empty document as annotated", () => {
     expect(hasAnnotationContent(baseDocument)).toBe(false);
   });

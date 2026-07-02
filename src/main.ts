@@ -1,11 +1,11 @@
-﻿import { Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
+import { MarkdownRenderChild, Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
 import { hasAnnotationContent, type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
 import { copyAnnotatedImageToClipboard } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
 import { putFabricJson } from "./fabric-adapter";
 import { createFabricPreviewPngBlob } from "./fabric-preview";
-import { attachFabricOverlay, attachOverlay, hasFabricOverlay } from "./render-overlay";
+import { attachFabricOverlay, attachOverlay, hasFabricOverlay, type FabricOverlayHandle } from "./render-overlay";
 import { DEFAULT_SETTINGS, SkitchLayerSettingTab, type SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
@@ -73,9 +73,48 @@ export default class SkitchLayerPlugin extends Plugin {
     });
 
     this.registerEvent(this.app.workspace.on("layout-change", () => this.scheduleRefreshVisibleAnnotations()));
+    this.registerEvent(this.app.vault.on("create", (file) => {
+      if (file instanceof TFile && file.path.endsWith(".skitch.json")) {
+        this.storage.invalidateIndex();
+        this.scheduleRefreshVisibleAnnotations();
+      }
+    }));
     this.registerEvent(this.app.vault.on("modify", (file) => {
       if (file instanceof TFile && file.path.endsWith(".skitch.json")) {
+        this.storage.invalidateIndex();
         this.scheduleRefreshVisibleAnnotations();
+      }
+    }));
+    this.registerEvent(this.app.vault.on("delete", (file) => {
+      if (!(file instanceof TFile)) {
+        return;
+      }
+      if (file.path.endsWith(".skitch.json")) {
+        this.storage.invalidateIndex();
+        this.scheduleRefreshVisibleAnnotations();
+        return;
+      }
+      if (this.isSupportedImage(file)) {
+        this.storage.handleImageDeleted(file.path).catch((error) => {
+          console.warn("Skitch Layer failed to clean up deleted image annotations", error);
+        });
+      }
+    }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      if (!(file instanceof TFile)) {
+        return;
+      }
+      if (file.path.endsWith(".skitch.json") || oldPath.endsWith(".skitch.json")) {
+        this.storage.invalidateIndex();
+        this.scheduleRefreshVisibleAnnotations();
+        return;
+      }
+      if (this.isSupportedImage(file) || this.isSupportedImagePath(oldPath)) {
+        this.storage.handleImageRenamed(oldPath, file.path).then(() => {
+          this.scheduleRefreshVisibleAnnotations();
+        }).catch((error) => {
+          console.warn("Skitch Layer failed to rename image annotations", error);
+        });
       }
     }));
 
@@ -129,7 +168,7 @@ export default class SkitchLayerPlugin extends Plugin {
       if (!annotation || !hasAnnotationContent(annotation)) {
         continue;
       }
-      await this.applyAnnotationToImage(image, annotation);
+      await this.applyAnnotationToImage(image, annotation, context);
     }
   }
 
@@ -188,18 +227,24 @@ export default class SkitchLayerPlugin extends Plugin {
     }
   }
 
-  private async applyAnnotationToImage(image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
+  private async applyAnnotationToImage(
+    image: HTMLImageElement,
+    annotation: AnnotationDocument,
+    context?: MarkdownPostProcessorContext
+  ): Promise<void> {
     const parent = image.parentElement;
     if (!parent) {
       return;
     }
 
-    const wrapper = parent.hasClass("skitch-layer-wrapper") ? parent : image.ownerDocument.createElement("span");
-    if (!parent.hasClass("skitch-layer-wrapper")) {
+    const createdWrapper = !parent.hasClass("skitch-layer-wrapper");
+    const wrapper = createdWrapper ? image.ownerDocument.createElement("span") : parent;
+    if (createdWrapper) {
       wrapper.addClass("skitch-layer-wrapper");
       parent.insertBefore(wrapper, image);
       wrapper.appendChild(image);
     }
+    this.registerRenderLifecycle(context, wrapper, image, createdWrapper);
 
     wrapper.dataset.skitchImagePath = annotation.imagePath;
     wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
@@ -220,7 +265,8 @@ export default class SkitchLayerPlugin extends Plugin {
       } catch (error) {
         console.warn("Skitch Layer failed to render runtime annotated image", error);
         image.src = originalSrc;
-        await attachFabricOverlay(wrapper, annotation);
+        const overlayHandle = await attachFabricOverlay(wrapper, annotation);
+        this.registerFabricOverlayLifecycle(context, overlayHandle);
       }
       return;
     }
@@ -230,6 +276,25 @@ export default class SkitchLayerPlugin extends Plugin {
     attachOverlay(wrapper, annotation);
   }
 
+  private registerRenderLifecycle(
+    context: MarkdownPostProcessorContext | undefined,
+    wrapper: HTMLElement,
+    image: HTMLImageElement,
+    createdWrapper: boolean
+  ): void {
+    if (!context || wrapper.dataset.skitchRenderChild === context.docId) {
+      return;
+    }
+    wrapper.dataset.skitchRenderChild = context.docId;
+    context.addChild(new SkitchImageRenderChild(wrapper, image, createdWrapper, (url) => this.revokeRuntimePreviewUrl(url)));
+  }
+
+  private registerFabricOverlayLifecycle(context: MarkdownPostProcessorContext | undefined, overlayHandle: FabricOverlayHandle): void {
+    if (!context) {
+      return;
+    }
+    context.addChild(new SkitchFabricOverlayRenderChild(overlayHandle.element, overlayHandle));
+  }
   private revokeRuntimePreviewUrl(url: string | undefined): void {
     if (!url || !this.runtimePreviewUrls.has(url)) {
       return;
@@ -326,13 +391,14 @@ export default class SkitchLayerPlugin extends Plugin {
 
   private findCopyTargetWrapper(event: ClipboardEvent): HTMLElement | null {
     const selection = document.getSelection();
-    if (selection && selection.rangeCount > 0) {
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
-      const selectedWrappers = Array.from(document.querySelectorAll<HTMLElement>(".skitch-layer-wrapper"));
-      const selectedWrapper = selectedWrappers.find((wrapper) => range.intersectsNode(wrapper));
-      if (selectedWrapper) {
-        return selectedWrapper;
+      const selectedWrappers = Array.from(document.querySelectorAll<HTMLElement>(".skitch-layer-wrapper"))
+        .filter((wrapper) => range.intersectsNode(wrapper));
+      if (selectedWrappers.length === 1 && selection.toString().trim().length === 0) {
+        return selectedWrappers[0];
       }
+      return null;
     }
 
     const target = event.target instanceof HTMLElement ? event.target : null;
@@ -340,11 +406,6 @@ export default class SkitchLayerPlugin extends Plugin {
   }
 
   private resolveImageFile(image: HTMLImageElement, sourcePath: string): TFile | null {
-    const directFromSource = this.findImageFileByResourceSrc(image.src);
-    if (directFromSource) {
-      return directFromSource;
-    }
-
     const linkText = image.getAttribute("data-path") || image.getAttribute("alt") || "";
     const candidates = [linkText, decodeURIComponent(linkText)].filter(Boolean);
     for (const candidate of candidates) {
@@ -357,7 +418,7 @@ export default class SkitchLayerPlugin extends Plugin {
         return direct;
       }
     }
-    return null;
+    return this.findImageFileByResourceSrc(image.src);
   }
 
   private imageMatchesFile(image: HTMLImageElement, file: TFile): boolean {
@@ -369,7 +430,7 @@ export default class SkitchLayerPlugin extends Plugin {
     if (imageSource === resourcePath || imageSource.startsWith(`${resourcePath}?`) || imageSource.startsWith(`${resourcePath}#`)) {
       return true;
     }
-    return imageSource.includes(encodeURI(file.path)) || imageSource.includes(file.path) || image.alt === file.basename || image.alt === file.path;
+    return imageSource.includes(encodeURI(file.path)) || imageSource.includes(file.path) || image.alt === file.path;
   }
 
   private findImageFileByResourceSrc(src: string): TFile | null {
@@ -385,7 +446,12 @@ export default class SkitchLayerPlugin extends Plugin {
   }
 
   private isSupportedImage(file: TFile): boolean {
-    return SUPPORTED_IMAGE_EXTENSIONS.has(file.extension.toLowerCase());
+    return this.isSupportedImagePath(file.path);
+  }
+
+  private isSupportedImagePath(path: string): boolean {
+    const extension = path.split(".").pop()?.toLowerCase() ?? "";
+    return SUPPORTED_IMAGE_EXTENSIONS.has(extension);
   }
 
   private mutationMayContainImage(mutation: MutationRecord): boolean {
@@ -398,5 +464,45 @@ export default class SkitchLayerPlugin extends Plugin {
       }
     }
     return false;
+  }
+
+}
+class SkitchImageRenderChild extends MarkdownRenderChild {
+  constructor(
+    private readonly wrapper: HTMLElement,
+    private readonly image: HTMLImageElement,
+    private readonly createdWrapper: boolean,
+    private readonly revokeRuntimePreviewUrl: (url: string | undefined) => void
+  ) {
+    super(wrapper);
+  }
+
+  onunload(): void {
+    this.wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    this.revokeRuntimePreviewUrl(this.image.dataset.skitchRuntimePreviewUrl);
+    this.image.dataset.skitchRuntimePreviewUrl = "";
+    const originalSrc = this.image.dataset.skitchOriginalSrc;
+    if (originalSrc) {
+      this.image.src = originalSrc;
+    }
+    if (this.createdWrapper && this.wrapper.parentElement && this.image.parentElement === this.wrapper) {
+      this.wrapper.parentElement.insertBefore(this.image, this.wrapper);
+      this.wrapper.remove();
+    }
+  }
+}
+
+class SkitchFabricOverlayRenderChild extends MarkdownRenderChild {
+  constructor(
+    containerEl: HTMLElement,
+    private readonly overlayHandle: FabricOverlayHandle
+  ) {
+    super(containerEl);
+  }
+
+  onunload(): void {
+    this.overlayHandle.dispose().catch((error) => {
+      console.warn("Skitch Layer failed to dispose Fabric overlay", error);
+    });
   }
 }

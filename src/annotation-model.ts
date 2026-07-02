@@ -1,4 +1,4 @@
-﻿export type Point = {
+export type Point = {
   x: number;
   y: number;
 };
@@ -163,7 +163,21 @@ export function annotationToSvgGeometry(annotation: AnnotationObject, imageSize:
 }
 
 export function hasAnnotationContent(document: AnnotationDocument): boolean {
-  return document.objects.length > 0 || Boolean(document.engine?.fabricJson);
+  if (document.objects.length > 0) {
+    return true;
+  }
+  return hasFabricJsonContent(document.engine?.fabricJson);
+}
+
+function hasFabricJsonContent(fabricJson: unknown): boolean {
+  if (!fabricJson || typeof fabricJson !== "object" || Array.isArray(fabricJson)) {
+    return false;
+  }
+  const objects = (fabricJson as { objects?: unknown }).objects;
+  if (Array.isArray(objects)) {
+    return objects.length > 0;
+  }
+  return true;
 }
 
 function assertPositiveImageSize(imageSize: ImageSize): void {
