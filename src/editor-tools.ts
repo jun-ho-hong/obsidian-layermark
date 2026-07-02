@@ -43,6 +43,10 @@ export function normalizeFontSize(value: number): number {
   return Math.min(220, Math.max(12, Math.round(value)));
 }
 
+export function normalizeNewTextFontSize(value: number): number {
+  return Math.max(56, normalizeFontSize(value));
+}
+
 export type ArrowPathPoint = {
   x: number;
   y: number;

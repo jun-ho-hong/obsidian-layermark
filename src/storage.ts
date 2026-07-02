@@ -124,6 +124,10 @@ export class AnnotationStorage {
     this.invalidateIndex();
   }
 
+  async deletePreview(imagePath: string): Promise<void> {
+    await this.deleteIfPresent(this.getPreviewPath(imagePath));
+  }
+
   private async renamePreviewIfPresent(oldImagePath: string, newImagePath: string): Promise<void> {
     const oldPreviewPath = this.getPreviewPath(oldImagePath);
     const newPreviewPath = this.getPreviewPath(newImagePath);

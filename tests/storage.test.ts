@@ -29,6 +29,24 @@ describe("AnnotationStorage preview writes", () => {
     expect(writes[0].path).not.toBe("assets/a/01.jpg");
     expect(new Uint8Array(writes[0].bytes)).toEqual(new Uint8Array([1, 2, 3]));
   });
+
+  it("deletes only the generated preview for an image", async () => {
+    const preview = Object.assign(new TFile(), { path: "assets/a/01.jpg.skitch.png" });
+    const deleted: string[] = [];
+    const app = {
+      vault: {
+        getAbstractFileByPath: (path: string) => path === preview.path ? preview : null,
+        delete: async (file: TFile) => {
+          deleted.push(file.path);
+        }
+      }
+    };
+    const storage = new AnnotationStorage(app as never);
+
+    await storage.deletePreview("assets/a/01.jpg");
+
+    expect(deleted).toEqual(["assets/a/01.jpg.skitch.png"]);
+  });
 });
 
 describe("AnnotationStorage annotation index", () => {

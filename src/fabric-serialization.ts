@@ -10,6 +10,16 @@ export type FabricSceneJson = {
 
 export const SKITCH_FABRIC_PROPERTIES = ["skitchRole", "skitchKind", "skitchBadgeId", "skitchBadgePart"];
 
+export type FabricClearableCanvas<TObject> = {
+  getObjects: () => TObject[];
+  remove: (object: TObject) => void;
+};
+
+export function removeAllFabricObjects<TObject>(canvas: FabricClearableCanvas<TObject>): void {
+  for (const object of [...canvas.getObjects()]) {
+    canvas.remove(object);
+  }
+}
 export function serializeFabricScene(objects: FabricSerializableObject[]): FabricSceneJson {
   const serialized: Record<string, unknown>[] = [];
   for (const object of objects) {

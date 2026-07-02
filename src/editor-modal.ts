@@ -5,6 +5,7 @@ import {
   normalizePoint,
   type AnnotationDocument,
   type AnnotationObject,
+  hasAnnotationContent,
   type ImageSize,
   type Point
 } from "./annotation-model";
@@ -16,13 +17,14 @@ import {
   nextBadgeNumber,
   normalizeBadgeNumber,
   normalizeFontSize,
+  normalizeNewTextFontSize,
   normalizeStrokeWidth,
   toolFromShortcut,
   type AnnotationStyleState,
   type EditorTool
 } from "./editor-tools";
 import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
-import { serializeFabricScene } from "./fabric-serialization";
+import { removeAllFabricObjects, serializeFabricScene } from "./fabric-serialization";
 import type { SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
@@ -719,9 +721,12 @@ export class AnnotationEditorModal extends Modal {
       return;
     }
     const value = this.textEditorEl.value.trim();
-    const width = measureTextBoxWidth(value, this.style.fontSize, this.textFontFamily, this.textBold);
     const point = this.textEditorPoint;
     const committedEditingObject = this.textEditorObject ?? editingObject;
+    const committedFontSize = committedEditingObject
+      ? normalizeFontSize(Number(committedEditingObject.get("fontSize")) || this.style.fontSize)
+      : normalizeNewTextFontSize(this.style.fontSize);
+    const width = measureTextBoxWidth(value, committedFontSize, this.textFontFamily, this.textBold);
     this.textEditorEl.remove();
     this.textEditorEl = null;
     this.textEditorPoint = null;
@@ -744,7 +749,7 @@ export class AnnotationEditorModal extends Modal {
       width,
       visible: true,
       fill: this.style.color,
-      fontSize: this.style.fontSize,
+      fontSize: committedFontSize,
       fontWeight: this.textBold ? "700" : "400",
       fontFamily: this.textFontFamily,
       selectable: true,
@@ -881,9 +886,7 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return;
     }
-    this.canvas.getObjects().forEach((object) => {
-      this.canvas?.remove(object);
-    });
+    removeAllFabricObjects(this.canvas);
     this.canvas.discardActiveObject();
     this.canvas.renderAll();
   }
@@ -952,6 +955,10 @@ export class AnnotationEditorModal extends Modal {
 
   private async savePreviewBestEffort(document: AnnotationDocument): Promise<void> {
     try {
+      if (!hasAnnotationContent(document)) {
+        await this.storage.deletePreview(document.imagePath);
+        return;
+      }
       const previewBlob = await createFabricPreviewPngBlob(document, this.app.vault.getResourcePath(this.imageFile));
       const previewBytes = await previewBlob.arrayBuffer();
       await this.storage.savePreview(document.imagePath, previewBytes);

@@ -217,16 +217,46 @@ export default class SkitchLayerPlugin extends Plugin {
     const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     const images = Array.from(document.querySelectorAll<HTMLImageElement>(".workspace-leaf-content img"));
     for (const image of images) {
-      if (file instanceof TFile && this.imageMatchesFile(image, file)) {
-        await this.applyAnnotationToImage(image, annotation);
+      if (!this.imageBelongsToAnnotation(image, annotation, file instanceof TFile ? file : null)) {
         continue;
       }
-      if (imageLooksLikeAnnotationTarget(image, annotation)) {
+      if (hasAnnotationContent(annotation)) {
         await this.applyAnnotationToImage(image, annotation);
+      } else {
+        this.removeAnnotationFromImage(image, annotation);
       }
     }
   }
 
+  private imageBelongsToAnnotation(image: HTMLImageElement, annotation: AnnotationDocument, file: TFile | null): boolean {
+    const wrapper = image.closest<HTMLElement>(".skitch-layer-wrapper");
+    if (wrapper?.dataset.skitchImagePath === annotation.imagePath) {
+      return true;
+    }
+    if (file && this.imageMatchesFile(image, file)) {
+      return true;
+    }
+    return imageLooksLikeAnnotationTarget(image, annotation);
+  }
+
+  private removeAnnotationFromImage(image: HTMLImageElement, annotation: AnnotationDocument): void {
+    const wrapper = image.closest<HTMLElement>(".skitch-layer-wrapper");
+    const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+    const originalSrc = originalFile instanceof TFile
+      ? this.app.vault.getResourcePath(originalFile)
+      : image.dataset.skitchOriginalSrc;
+    wrapper?.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    this.revokeRuntimePreviewUrl(image.dataset.skitchRuntimePreviewUrl);
+    image.dataset.skitchRuntimePreviewUrl = "";
+    if (originalSrc) {
+      image.src = originalSrc;
+      image.dataset.skitchOriginalSrc = originalSrc;
+    }
+    if (wrapper?.hasClass("skitch-layer-wrapper") && wrapper.parentElement && image.parentElement === wrapper) {
+      wrapper.parentElement.insertBefore(image, wrapper);
+      wrapper.remove();
+    }
+  }
   private async applyAnnotationToImage(
     image: HTMLImageElement,
     annotation: AnnotationDocument,
