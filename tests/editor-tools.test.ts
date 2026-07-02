@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { createArrowPathData, nextBadgeNumber, normalizeBadgeNumber, normalizeFontSize, normalizeNewTextFontSize, normalizeStrokeWidth, toolFromShortcut } from "../src/editor-tools";
+import {
+  DEFAULT_TEXT_FONT_FAMILY,
+  createArrowPathData,
+  isContinuousTool,
+  nextBadgeNumber,
+  normalizeBadgeNumber,
+  normalizeFontSize,
+  normalizeNewTextFontSize,
+  normalizeStrokeWidth,
+  normalizeTextFontFamily,
+  toolFromShortcut
+} from "../src/editor-tools";
 
 describe("editor tools", () => {
   it("maps keyboard shortcuts to tools", () => {
@@ -39,6 +50,18 @@ describe("editor tools", () => {
     expect(normalizeFontSize(999)).toBe(220);
     expect(normalizeNewTextFontSize(8)).toBe(56);
     expect(normalizeNewTextFontSize(72)).toBe(72);
+  });
+
+  it("uses concrete canvas font families instead of CSS variables", () => {
+    expect(DEFAULT_TEXT_FONT_FAMILY).not.toContain("var(");
+    expect(normalizeTextFontFamily("var(--font-interface, sans-serif)")).toBe(DEFAULT_TEXT_FONT_FAMILY);
+    expect(normalizeTextFontFamily("Arial, Helvetica, sans-serif")).toBe("Arial, Helvetica, sans-serif");
+  });
+
+  it("keeps badge active as a continuous stamping tool", () => {
+    expect(isContinuousTool("badge")).toBe(true);
+    expect(isContinuousTool("text")).toBe(false);
+    expect(isContinuousTool("arrow")).toBe(false);
   });
 
   it("creates a single serializable path for arrows", () => {

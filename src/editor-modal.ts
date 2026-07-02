@@ -12,13 +12,16 @@ import {
 import { getFabricJson, putFabricJson } from "./fabric-adapter";
 import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import {
+  DEFAULT_TEXT_FONT_FAMILY,
   DEFAULT_STYLE,
   createArrowPathData,
+  isContinuousTool,
   nextBadgeNumber,
   normalizeBadgeNumber,
   normalizeFontSize,
   normalizeNewTextFontSize,
   normalizeStrokeWidth,
+  normalizeTextFontFamily,
   toolFromShortcut,
   type AnnotationStyleState,
   type EditorTool
@@ -54,7 +57,7 @@ export class AnnotationEditorModal extends Modal {
   private zoom = 1;
   private resizeObserver: ResizeObserver | null = null;
   private style: AnnotationStyleState;
-  private textFontFamily = "var(--font-interface, sans-serif)";
+  private textFontFamily = DEFAULT_TEXT_FONT_FAMILY;
   private textBold = true;
   private isPanning = false;
   private panStart: { x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
@@ -240,7 +243,7 @@ export class AnnotationEditorModal extends Modal {
     const fontFamily = container.createEl("select", { cls: "skitch-layer-font-family-input" });
     fontFamily.title = "Text font";
     for (const [label, value] of [
-      ["\uae30\ubcf8", "var(--font-interface, sans-serif)"],
+      ["\uae30\ubcf8", DEFAULT_TEXT_FONT_FAMILY],
       ["Sans", "Arial, Helvetica, sans-serif"],
       ["Serif", "Georgia, serif"],
       ["Mono", "Consolas, monospace"]
@@ -249,7 +252,7 @@ export class AnnotationEditorModal extends Modal {
     }
     fontFamily.value = this.textFontFamily;
     fontFamily.addEventListener("change", () => {
-      this.textFontFamily = fontFamily.value;
+      this.textFontFamily = normalizeTextFontFamily(fontFamily.value);
       this.applyStyleToSelection();
     });
     this.fontFamilySelectEl = fontFamily;
@@ -403,7 +406,7 @@ export class AnnotationEditorModal extends Modal {
       top: position.y,
       fill: object.style.color,
       fontSize: object.style.fontSize ?? 28,
-      fontFamily: "var(--font-interface, sans-serif)"
+      fontFamily: DEFAULT_TEXT_FONT_FAMILY
     });
   }
 
@@ -630,7 +633,7 @@ export class AnnotationEditorModal extends Modal {
         this.fontSizeInputEl.value = String(this.style.fontSize);
       }
     }
-    const fontFamily = String(object.get("fontFamily") || "");
+    const fontFamily = normalizeTextFontFamily(String(object.get("fontFamily") || ""));
     if (fontFamily && this.fontFamilySelectEl && Array.from(this.fontFamilySelectEl.options).some((option) => option.value === fontFamily)) {
       this.textFontFamily = fontFamily;
       this.fontFamilySelectEl.value = fontFamily;
@@ -751,7 +754,7 @@ export class AnnotationEditorModal extends Modal {
       fill: this.style.color,
       fontSize: committedFontSize,
       fontWeight: this.textBold ? "700" : "400",
-      fontFamily: this.textFontFamily,
+      fontFamily: normalizeTextFontFamily(this.textFontFamily),
       selectable: true,
       evented: true
     } as Partial<Textbox>);
@@ -808,7 +811,9 @@ export class AnnotationEditorModal extends Modal {
     image.src = source;
     this.settings.nextBadgeNumber = nextBadgeNumber(number);
     this.syncBadgeNumberControl();
-    this.setTool("select");
+    if (!isContinuousTool(this.tool)) {
+      this.setTool("select");
+    }
     this.configureTool();
   }
 
@@ -1023,7 +1028,7 @@ function applyStyleToObject(object: FabricObject, style: AnnotationStyleState, t
     object.set({
       fill: style.color,
       fontSize: style.fontSize,
-      fontFamily: textFontFamily,
+      fontFamily: normalizeTextFontFamily(textFontFamily),
       fontWeight: textBold ? "700" : "400"
     } as Partial<FabricObject>);
     return;
@@ -1070,7 +1075,7 @@ function measureTextBoxWidth(value: string, fontSize: number, fontFamily: string
   if (!context) {
     return fallbackWidth;
   }
-  context.font = `${textBold ? "700" : "400"} ${fontSize}px ${fontFamily}`;
+  context.font = `${textBold ? "700" : "400"} ${fontSize}px ${normalizeTextFontFamily(fontFamily)}`;
   const lines = value.split(/\r?\n/);
   const width = Math.max(...lines.map((line) => context.measureText(line || " ").width));
   return Math.max(48, Math.ceil(width + fontSize * 0.6));

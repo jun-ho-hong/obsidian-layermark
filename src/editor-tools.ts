@@ -12,6 +12,8 @@ export const DEFAULT_STYLE: AnnotationStyleState = {
   fontSize: 32
 };
 
+export const DEFAULT_TEXT_FONT_FAMILY = "Arial, Helvetica, sans-serif";
+
 const TOOL_SHORTCUTS: Record<string, EditorTool> = {
   "1": "select",
   "2": "pen",
@@ -45,6 +47,18 @@ export function normalizeFontSize(value: number): number {
 
 export function normalizeNewTextFontSize(value: number): number {
   return Math.max(56, normalizeFontSize(value));
+}
+
+export function normalizeTextFontFamily(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("var(")) {
+    return DEFAULT_TEXT_FONT_FAMILY;
+  }
+  return trimmed;
+}
+
+export function isContinuousTool(tool: EditorTool): boolean {
+  return tool === "badge";
 }
 
 export type ArrowPathPoint = {

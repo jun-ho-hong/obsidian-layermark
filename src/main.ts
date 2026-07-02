@@ -356,16 +356,12 @@ export default class SkitchLayerPlugin extends Plugin {
 
   private async openAnnotatedImageContextMenu(event: MouseEvent): Promise<void> {
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const wrapper = target?.closest<HTMLElement>(".skitch-layer-wrapper");
-    if (!wrapper) {
+    const wrapper = target?.closest<HTMLElement>(".skitch-layer-wrapper") ?? null;
+    const image = wrapper?.querySelector<HTMLImageElement>("img") ?? (target?.closest<HTMLImageElement>("img") ?? null);
+    if (!image) {
       return;
     }
-    const image = wrapper.querySelector<HTMLImageElement>("img");
-    const imagePath = wrapper.dataset.skitchImagePath;
-    if (!image || !imagePath) {
-      return;
-    }
-    const annotation = await this.storage.load(imagePath);
+    const annotation = await this.findContextMenuAnnotation(image, wrapper);
     if (!annotation || !hasAnnotationContent(annotation)) {
       return;
     }
@@ -408,10 +404,33 @@ export default class SkitchLayerPlugin extends Plugin {
     menu.showAtMouseEvent(event);
   }
 
-  private async clearAnnotationFromMenu(wrapper: HTMLElement, image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
+  private async findContextMenuAnnotation(image: HTMLImageElement, wrapper: HTMLElement | null): Promise<AnnotationDocument | null> {
+    const wrappedImagePath = wrapper?.dataset.skitchImagePath;
+    if (wrappedImagePath) {
+      return this.storage.load(wrappedImagePath);
+    }
+    const originalPath = image.dataset.skitchOriginalPath;
+    if (originalPath) {
+      return this.storage.load(originalPath);
+    }
+    const annotations = await this.storage.listSavedAnnotations();
+    for (const annotation of annotations) {
+      const file = this.app.vault.getAbstractFileByPath(annotation.imagePath);
+      if (file instanceof TFile && this.imageMatchesFile(image, file)) {
+        return annotation;
+      }
+      if (imageLooksLikeAnnotationTarget(image, annotation)) {
+        return annotation;
+      }
+    }
+    return null;
+  }
+
+  private async clearAnnotationFromMenu(wrapper: HTMLElement | null, image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
     const cleared = putFabricJson({ ...annotation, objects: [] }, { version: "7.4.0", objects: [] });
     await this.storage.save(cleared);
-    wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    await this.storage.deletePreview(annotation.imagePath);
+    wrapper?.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
     const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     if (originalFile instanceof TFile) {
       image.src = this.app.vault.getResourcePath(originalFile);
