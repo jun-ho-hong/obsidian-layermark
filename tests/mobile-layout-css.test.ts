@@ -17,4 +17,9 @@ describe("mobile editor layout CSS", () => {
     expect(css).toContain("min-width: 44px");
     expect(css).toContain("touch-action: manipulation");
   });
+
+  it("reserves the fabric stage for custom touch gestures", () => {
+    expect(css).toContain(".skitch-layer-fabric-stage");
+    expect(css).toContain("touch-action: none");
+  });
 });

@@ -280,6 +280,7 @@
 .skitch-layer-fabric-stage {
   display: block;
   padding: 24px;
+  touch-action: none;
 }
 
 .skitch-layer-fabric-stage.is-panning {

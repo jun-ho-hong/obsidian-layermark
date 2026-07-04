@@ -31,6 +31,12 @@ import { removeAllFabricObjects, serializeFabricScene } from "./fabric-serializa
 import { createInteractiveCanvasOptions } from "./mobile-compat";
 import type { SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
+import {
+  calculateTouchViewport,
+  createTouchSnapshot,
+  type TouchGesturePoint,
+  type TouchViewportStart
+} from "./touch-gesture";
 
 const COLOR_PRESETS = ["#ff2b7a", "#ff8a1f", "#ffd400", "#22c55e", "#38bdf8", "#8b5cf6", "#ffffff", "#111827"];
 
@@ -62,6 +68,8 @@ export class AnnotationEditorModal extends Modal {
   private textBold = true;
   private isPanning = false;
   private panStart: { x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
+  private activeTouchPointers = new Map<number, TouchGesturePoint>();
+  private touchViewportStart: TouchViewportStart | null = null;
 
   constructor(
     app: App,
@@ -168,6 +176,8 @@ export class AnnotationEditorModal extends Modal {
     this.textEditorEl = null;
     this.textEditorPoint = null;
     this.textEditorObject = null;
+    this.activeTouchPointers.clear();
+    this.touchViewportStart = null;
     this.contentEl.empty();
   }
 
@@ -562,6 +572,10 @@ export class AnnotationEditorModal extends Modal {
       { passive: false }
     );
     this.stageEl?.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "touch") {
+        this.handleTouchPointerDown(event);
+        return;
+      }
       if (!this.stageEl || (event.button !== 1 && !event.shiftKey && !event.altKey)) {
         return;
       }
@@ -577,6 +591,10 @@ export class AnnotationEditorModal extends Modal {
       this.stageEl.addClass("is-panning");
     });
     this.stageEl?.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch") {
+        this.handleTouchPointerMove(event);
+        return;
+      }
       if (!this.stageEl || !this.isPanning || !this.panStart) {
         return;
       }
@@ -584,8 +602,113 @@ export class AnnotationEditorModal extends Modal {
       this.stageEl.scrollLeft = this.panStart.scrollLeft - (event.clientX - this.panStart.x);
       this.stageEl.scrollTop = this.panStart.scrollTop - (event.clientY - this.panStart.y);
     });
-    this.stageEl?.addEventListener("pointerup", (event) => this.stopPanning(event));
-    this.stageEl?.addEventListener("pointercancel", (event) => this.stopPanning(event));
+    this.stageEl?.addEventListener("pointerup", (event) => {
+      if (event.pointerType === "touch") {
+        this.handleTouchPointerEnd(event);
+      }
+      this.stopPanning(event);
+    });
+    this.stageEl?.addEventListener("pointercancel", (event) => {
+      if (event.pointerType === "touch") {
+        this.handleTouchPointerEnd(event);
+      }
+      this.stopPanning(event);
+    });
+  }
+
+  private handleTouchPointerDown(event: PointerEvent): void {
+    if (!this.stageEl) {
+      return;
+    }
+    this.activeTouchPointers.set(event.pointerId, this.toStageTouchPoint(event));
+    if (this.activeTouchPointers.size >= 2) {
+      event.preventDefault();
+      this.beginTouchViewportGesture();
+    }
+  }
+
+  private handleTouchPointerMove(event: PointerEvent): void {
+    if (!this.stageEl || !this.activeTouchPointers.has(event.pointerId)) {
+      return;
+    }
+    this.activeTouchPointers.set(event.pointerId, this.toStageTouchPoint(event));
+    if (!this.touchViewportStart) {
+      return;
+    }
+    const current = createTouchSnapshot(Array.from(this.activeTouchPointers.values()));
+    if (!current) {
+      return;
+    }
+    event.preventDefault();
+    const viewport = calculateTouchViewport({ start: this.touchViewportStart, current });
+    this.setZoom(viewport.zoom);
+    this.stageEl.scrollLeft = viewport.scrollLeft;
+    this.stageEl.scrollTop = viewport.scrollTop;
+  }
+
+  private handleTouchPointerEnd(event: PointerEvent): void {
+    if (!this.stageEl || !this.activeTouchPointers.has(event.pointerId)) {
+      return;
+    }
+    this.activeTouchPointers.delete(event.pointerId);
+    this.releaseStagePointer(event.pointerId);
+    const snapshot = createTouchSnapshot(Array.from(this.activeTouchPointers.values()));
+    if (snapshot) {
+      this.touchViewportStart = {
+        snapshot,
+        zoom: this.zoom,
+        scrollLeft: this.stageEl.scrollLeft,
+        scrollTop: this.stageEl.scrollTop
+      };
+      return;
+    }
+    this.touchViewportStart = null;
+    this.stageEl.removeClass("is-panning");
+  }
+
+  private beginTouchViewportGesture(): void {
+    if (!this.stageEl) {
+      return;
+    }
+    const snapshot = createTouchSnapshot(Array.from(this.activeTouchPointers.values()));
+    if (!snapshot) {
+      return;
+    }
+    this.touchViewportStart = {
+      snapshot,
+      zoom: this.zoom,
+      scrollLeft: this.stageEl.scrollLeft,
+      scrollTop: this.stageEl.scrollTop
+    };
+    for (const pointerId of this.activeTouchPointers.keys()) {
+      this.captureStagePointer(pointerId);
+    }
+    this.stageEl.addClass("is-panning");
+  }
+
+  private toStageTouchPoint(event: PointerEvent): TouchGesturePoint {
+    const rect = this.stageEl?.getBoundingClientRect();
+    return {
+      pointerId: event.pointerId,
+      x: rect ? event.clientX - rect.left : event.clientX,
+      y: rect ? event.clientY - rect.top : event.clientY
+    };
+  }
+
+  private captureStagePointer(pointerId: number): void {
+    try {
+      this.stageEl?.setPointerCapture(pointerId);
+    } catch {
+      // The browser may reject capture for pointers already owned elsewhere.
+    }
+  }
+
+  private releaseStagePointer(pointerId: number): void {
+    try {
+      this.stageEl?.releasePointerCapture(pointerId);
+    } catch {
+      // Pointer capture may already be released by the browser.
+    }
   }
 
   private stopPanning(event: PointerEvent): void {
