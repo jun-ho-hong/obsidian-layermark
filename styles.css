@@ -342,3 +342,78 @@
 .skitch-layer-fabric-canvas {
   display: block;
 }
+
+@media (max-width: 700px) {
+  .skitch-layer-modal-container {
+    width: 100vw;
+    max-width: 100vw;
+  }
+
+  .skitch-layer-modal {
+    height: min(100dvh, 100vh);
+  }
+
+  .skitch-layer-toolbar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 0 12px;
+  }
+
+  .skitch-layer-toolbar-title {
+    max-width: 100%;
+    padding: 0 4px;
+  }
+
+  .skitch-layer-tool-palette {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .skitch-layer-tool-group,
+  .skitch-layer-style-controls,
+  .skitch-layer-color-presets,
+  .skitch-layer-badge-number-controls.is-visible {
+    flex-wrap: nowrap;
+  }
+
+  .skitch-layer-style-controls,
+  .skitch-layer-badge-number-controls {
+    flex: 0 0 auto;
+  }
+
+  .skitch-layer-tool-group button,
+  .skitch-layer-actions button,
+  .skitch-layer-badge-number-button,
+  .skitch-layer-badge-number-reset,
+  .skitch-layer-bold-button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .skitch-layer-actions {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .skitch-layer-actions .setting-item-control {
+    justify-content: flex-start;
+    min-width: max-content;
+  }
+
+  .skitch-layer-stage {
+    min-height: 240px;
+    margin-top: 10px;
+  }
+
+  .skitch-layer-fabric-stage {
+    padding: 12px;
+  }
+}
