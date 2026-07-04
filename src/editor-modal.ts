@@ -28,6 +28,7 @@ import {
 } from "./editor-tools";
 import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
 import { removeAllFabricObjects, serializeFabricScene } from "./fabric-serialization";
+import { createInteractiveCanvasOptions } from "./mobile-compat";
 import type { SkitchLayerSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
@@ -135,13 +136,7 @@ export class AnnotationEditorModal extends Modal {
     this.fabricCanvasEl.width = imageSize.width;
     this.fabricCanvasEl.height = imageSize.height;
 
-    this.canvas = new Canvas(this.fabricCanvasEl, {
-      width: imageSize.width,
-      height: imageSize.height,
-      enableRetinaScaling: false,
-      preserveObjectStacking: true,
-      selection: true
-    });
+    this.canvas = new Canvas(this.fabricCanvasEl, createInteractiveCanvasOptions(imageSize));
 
     await this.loadFabricScene(this.document, imageSize);
     this.configureTool();
