@@ -318,6 +318,7 @@
   background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
   caret-color: currentColor;
+  font-size: max(16px, 1em);
   line-height: 1.2;
   overflow: hidden;
   resize: none;

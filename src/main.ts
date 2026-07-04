@@ -1,8 +1,14 @@
 import { MarkdownRenderChild, Menu, Notice, Plugin, TFile, type MarkdownPostProcessorContext } from "obsidian";
 import { hasAnnotationContent, type AnnotationDocument } from "./annotation-model";
 import { AnnotationEditorModal } from "./editor-modal";
-import { copyAnnotatedImageToClipboard } from "./flatten-image";
+import { copyAnnotatedImageToClipboard, createAnnotatedImageBlob } from "./flatten-image";
 import { imageLooksLikeAnnotationTarget, normalizeComparableUrl } from "./image-match";
+import {
+  LONG_PRESS_DELAY_MS,
+  hasLongPressMoved,
+  isTouchPointer,
+  type LongPressPoint
+} from "./long-press";
 import { putFabricJson } from "./fabric-adapter";
 import { createFabricPreviewPngBlob } from "./fabric-preview";
 import { attachFabricOverlay, attachOverlay, hasFabricOverlay, type FabricOverlayHandle } from "./render-overlay";
@@ -15,6 +21,8 @@ export default class SkitchLayerPlugin extends Plugin {
   private storage!: AnnotationStorage;
   private refreshTimer: number | null = null;
   private runtimePreviewUrls = new Set<string>();
+  private longPressTimer: number | null = null;
+  private longPressStart: (LongPressPoint & { pointerId: number; target: HTMLElement }) | null = null;
   settings: SkitchLayerSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
@@ -46,7 +54,12 @@ export default class SkitchLayerPlugin extends Plugin {
         console.warn("Skitch Layer failed to open annotated image menu", error);
       });
     });
+    this.registerDomEvent(document, "pointerdown", (event: PointerEvent) => this.beginAnnotatedImageLongPress(event));
+    this.registerDomEvent(document, "pointermove", (event: PointerEvent) => this.updateAnnotatedImageLongPress(event));
+    this.registerDomEvent(document, "pointerup", (event: PointerEvent) => this.cancelAnnotatedImageLongPress(event));
+    this.registerDomEvent(document, "pointercancel", (event: PointerEvent) => this.cancelAnnotatedImageLongPress(event));
     this.register(() => {
+      this.cancelAnnotatedImageLongPress();
       for (const url of this.runtimePreviewUrls) {
         URL.revokeObjectURL(url);
       }
@@ -350,12 +363,81 @@ export default class SkitchLayerPlugin extends Plugin {
 
     event.preventDefault();
     event.stopPropagation();
-    await copyAnnotatedImageToClipboard(image, annotation);
-    new Notice("Annotated image copied");
+    await this.copyAnnotatedImageWithFallback(image, annotation);
   }
 
   private async openAnnotatedImageContextMenu(event: MouseEvent): Promise<void> {
     const target = event.target instanceof HTMLElement ? event.target : null;
+    if (!target) {
+      return;
+    }
+    await this.openAnnotatedImageMenuForTarget(target, {
+      x: event.clientX,
+      y: event.clientY,
+      mouseEvent: event
+    });
+  }
+
+  private beginAnnotatedImageLongPress(event: PointerEvent): void {
+    if (!isTouchPointer(event.pointerType)) {
+      return;
+    }
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (!target || !this.findPotentialAnnotatedImageTarget(target)) {
+      return;
+    }
+    this.cancelAnnotatedImageLongPress();
+    this.longPressStart = {
+      pointerId: event.pointerId,
+      target,
+      x: event.clientX,
+      y: event.clientY
+    };
+    this.longPressTimer = window.setTimeout(() => {
+      const start = this.longPressStart;
+      if (!start) {
+        return;
+      }
+      this.longPressTimer = null;
+      this.openAnnotatedImageMenuForTarget(start.target, {
+        x: start.x,
+        y: start.y
+      }).catch((error) => {
+        console.warn("Skitch Layer failed to open long-press image menu", error);
+      });
+    }, LONG_PRESS_DELAY_MS);
+  }
+
+  private updateAnnotatedImageLongPress(event: PointerEvent): void {
+    const start = this.longPressStart;
+    if (!start || start.pointerId !== event.pointerId) {
+      return;
+    }
+    if (hasLongPressMoved(start, { x: event.clientX, y: event.clientY })) {
+      this.cancelAnnotatedImageLongPress(event);
+    }
+  }
+
+  private cancelAnnotatedImageLongPress(event?: PointerEvent): void {
+    if (event && this.longPressStart && this.longPressStart.pointerId !== event.pointerId) {
+      return;
+    }
+    if (this.longPressTimer !== null) {
+      window.clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressStart = null;
+  }
+
+  private findPotentialAnnotatedImageTarget(target: HTMLElement): HTMLImageElement | null {
+    const wrapper = target.closest<HTMLElement>(".skitch-layer-wrapper");
+    return wrapper?.querySelector<HTMLImageElement>("img") ?? target.closest<HTMLImageElement>("img");
+  }
+
+  private async openAnnotatedImageMenuForTarget(
+    target: HTMLElement,
+    position: { x: number; y: number; mouseEvent?: MouseEvent }
+  ): Promise<void> {
     const wrapper = target?.closest<HTMLElement>(".skitch-layer-wrapper") ?? null;
     const image = wrapper?.querySelector<HTMLImageElement>("img") ?? (target?.closest<HTMLImageElement>("img") ?? null);
     if (!image) {
@@ -366,7 +448,29 @@ export default class SkitchLayerPlugin extends Plugin {
       return;
     }
 
-    event.preventDefault();
+    position.mouseEvent?.preventDefault();
+    this.showAnnotatedImageMenu({
+      image,
+      wrapper,
+      annotation,
+      position,
+      event: position.mouseEvent
+    });
+  }
+
+  private showAnnotatedImageMenu({
+    image,
+    wrapper,
+    annotation,
+    position,
+    event
+  }: {
+    image: HTMLImageElement;
+    wrapper: HTMLElement | null;
+    annotation: AnnotationDocument;
+    position: { x: number; y: number };
+    event?: MouseEvent;
+  }): void {
     const menu = new Menu();
     menu.addItem((item) => {
       item
@@ -374,8 +478,7 @@ export default class SkitchLayerPlugin extends Plugin {
         .setIcon("copy")
         .onClick(async () => {
           try {
-            await copyAnnotatedImageToClipboard(image, annotation);
-            new Notice("Annotated image copied");
+            await this.copyAnnotatedImageWithFallback(image, annotation);
           } catch (error) {
             console.warn("Skitch Layer failed to copy annotated image", error);
             new Notice(error instanceof Error ? error.message : "Unable to copy annotated image");
@@ -401,7 +504,11 @@ export default class SkitchLayerPlugin extends Plugin {
           await this.clearAnnotationFromMenu(wrapper, image, annotation);
         });
     });
-    menu.showAtMouseEvent(event);
+    if (event) {
+      menu.showAtMouseEvent(event);
+    } else {
+      menu.showAtPosition(position);
+    }
   }
 
   private async findContextMenuAnnotation(image: HTMLImageElement, wrapper: HTMLElement | null): Promise<AnnotationDocument | null> {
@@ -436,6 +543,19 @@ export default class SkitchLayerPlugin extends Plugin {
       image.src = this.app.vault.getResourcePath(originalFile);
     }
     new Notice("Annotations cleared");
+  }
+
+  private async copyAnnotatedImageWithFallback(image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
+    try {
+      await copyAnnotatedImageToClipboard(image, annotation);
+      new Notice("Annotated image copied");
+      return;
+    } catch (error) {
+      const blob = await createAnnotatedImageBlob(image, annotation);
+      const previewPath = await this.storage.savePreview(annotation.imagePath, await blob.arrayBuffer());
+      console.warn("Skitch Layer clipboard copy unavailable; saved preview instead", error);
+      new Notice(`Clipboard unavailable. Preview saved to ${previewPath}`);
+    }
   }
 
   private findCopyTargetWrapper(event: ClipboardEvent): HTMLElement | null {

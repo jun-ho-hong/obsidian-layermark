@@ -786,6 +786,9 @@ export class AnnotationEditorModal extends Modal {
     const editor = this.frameEl.createEl("textarea", { cls: "skitch-layer-text-editor" });
     editor.value = initialText;
     editor.placeholder = "\ud14d\uc2a4\ud2b8 \uc785\ub825";
+    editor.enterKeyHint = "done";
+    editor.inputMode = "text";
+    editor.autocapitalize = "sentences";
     this.applyTextEditorStyle(editor, point);
     editor.addEventListener("keydown", (event) => {
       event.stopPropagation();

@@ -1,5 +1,6 @@
 import type { AnnotationDocument } from "./annotation-model";
 import { getFabricJson } from "./fabric-adapter";
+import { canWriteImageClipboard } from "./clipboard-capability";
 import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabric-preview";
 import { createPreviewSvg, loadImage, svgMarkupToPngBlob } from "./preview-generator";
 
@@ -13,15 +14,19 @@ export function createFlattenedSvgMarkup(document: AnnotationDocument, imageHref
 }
 
 export async function copyAnnotatedImageToClipboard(image: HTMLImageElement, annotation: AnnotationDocument): Promise<void> {
-  if (!navigator.clipboard || typeof ClipboardItem === "undefined") {
+  if (!canWriteImageClipboard()) {
     throw new Error("Clipboard image writing is not available in this Obsidian environment.");
   }
 
+  const blob = await createAnnotatedImageBlob(image, annotation);
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
+export async function createAnnotatedImageBlob(image: HTMLImageElement, annotation: AnnotationDocument): Promise<Blob> {
   const sourceSrc = image.dataset.skitchOriginalSrc || image.src;
-  const blob = hasFabricObjects(annotation)
+  return hasFabricObjects(annotation)
     ? await createFabricPreviewPngBlob(annotation, sourceSrc)
     : await createLegacyAnnotationPngBlob(image, annotation);
-  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 }
 
 async function createLegacyAnnotationPngBlob(image: HTMLImageElement, annotation: AnnotationDocument): Promise<Blob> {
