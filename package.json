@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs",
-    "dev": "node esbuild.config.mjs --watch"
+    "dev": "node esbuild.config.mjs --watch",
+    "release:check": "npm run build && npm test && node scripts/check-release.mjs"
   },
   "keywords": [
     "obsidian",

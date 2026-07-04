@@ -52,6 +52,10 @@ The JSON file is the editable source of truth. The PNG file is a generated previ
 
 4. Enable `Skitch Layer` in Obsidian community plugins.
 
+## BRAT beta installation
+
+See [docs/BRAT.md](docs/BRAT.md) for BRAT beta installation and release preparation.
+
 ## Development
 
 ```bash
