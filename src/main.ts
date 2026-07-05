@@ -7,6 +7,7 @@ import {
   LONG_PRESS_DELAY_MS,
   hasLongPressMoved,
   isTouchPointer,
+  shouldSuppressNativeContextMenu,
   type LongPressPoint
 } from "./long-press";
 import { putFabricJson } from "./fabric-adapter";
@@ -24,6 +25,7 @@ export default class LayerMarkPlugin extends Plugin {
   private runtimePreviewUrls = new Set<string>();
   private longPressTimer: number | null = null;
   private longPressStart: (LongPressPoint & { pointerId: number; target: HTMLElement }) | null = null;
+  private nativeContextMenuSuppressedAt: number | null = null;
   settings: LayerMarkSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
@@ -55,6 +57,9 @@ export default class LayerMarkPlugin extends Plugin {
         console.warn("LayerMark failed to open annotated image menu", error);
       });
     });
+    const suppressNativeContextMenu = (event: MouseEvent) => this.suppressNativeContextMenuAfterLongPress(event);
+    document.addEventListener("contextmenu", suppressNativeContextMenu, { capture: true });
+    this.register(() => document.removeEventListener("contextmenu", suppressNativeContextMenu, { capture: true }));
     this.registerDomEvent(document, "pointerdown", (event: PointerEvent) => this.beginAnnotatedImageLongPress(event));
     this.registerDomEvent(document, "pointermove", (event: PointerEvent) => this.updateAnnotatedImageLongPress(event));
     this.registerDomEvent(document, "pointerup", (event: PointerEvent) => this.cancelAnnotatedImageLongPress(event));
@@ -243,7 +248,7 @@ export default class LayerMarkPlugin extends Plugin {
   }
 
   private imageBelongsToAnnotation(image: HTMLImageElement, annotation: AnnotationDocument, file: TFile | null): boolean {
-    const wrapper = image.closest<HTMLElement>(".skitch-layer-wrapper");
+    const wrapper = image.closest<HTMLElement>(".layermark-wrapper");
     if (wrapper?.dataset.skitchImagePath === annotation.imagePath) {
       return true;
     }
@@ -254,19 +259,19 @@ export default class LayerMarkPlugin extends Plugin {
   }
 
   private removeAnnotationFromImage(image: HTMLImageElement, annotation: AnnotationDocument): void {
-    const wrapper = image.closest<HTMLElement>(".skitch-layer-wrapper");
+    const wrapper = image.closest<HTMLElement>(".layermark-wrapper");
     const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     const originalSrc = originalFile instanceof TFile
       ? this.app.vault.getResourcePath(originalFile)
       : image.dataset.skitchOriginalSrc;
-    wrapper?.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    wrapper?.querySelectorAll(":scope > .layermark-overlay, :scope > .layermark-fabric-overlay").forEach((overlay) => overlay.remove());
     this.revokeRuntimePreviewUrl(image.dataset.skitchRuntimePreviewUrl);
     image.dataset.skitchRuntimePreviewUrl = "";
     if (originalSrc) {
       image.src = originalSrc;
       image.dataset.skitchOriginalSrc = originalSrc;
     }
-    if (wrapper?.hasClass("skitch-layer-wrapper") && wrapper.parentElement && image.parentElement === wrapper) {
+    if (wrapper?.hasClass("layermark-wrapper") && wrapper.parentElement && image.parentElement === wrapper) {
       wrapper.parentElement.insertBefore(image, wrapper);
       wrapper.remove();
     }
@@ -281,17 +286,17 @@ export default class LayerMarkPlugin extends Plugin {
       return;
     }
 
-    const createdWrapper = !parent.hasClass("skitch-layer-wrapper");
+    const createdWrapper = !parent.hasClass("layermark-wrapper");
     const wrapper = createdWrapper ? image.ownerDocument.createElement("span") : parent;
     if (createdWrapper) {
-      wrapper.addClass("skitch-layer-wrapper");
+      wrapper.addClass("layermark-wrapper");
       parent.insertBefore(wrapper, image);
       wrapper.appendChild(image);
     }
     this.registerRenderLifecycle(context, wrapper, image, createdWrapper);
 
     wrapper.dataset.skitchImagePath = annotation.imagePath;
-    wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    wrapper.querySelectorAll(":scope > .layermark-overlay, :scope > .layermark-fabric-overlay").forEach((overlay) => overlay.remove());
     const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     const originalSrc = originalFile instanceof TFile ? this.app.vault.getResourcePath(originalFile) : image.src;
     if (originalFile instanceof TFile) {
@@ -400,6 +405,7 @@ export default class LayerMarkPlugin extends Plugin {
         return;
       }
       this.longPressTimer = null;
+      this.nativeContextMenuSuppressedAt = Date.now();
       this.openAnnotatedImageMenuForTarget(start.target, {
         x: start.x,
         y: start.y
@@ -430,8 +436,20 @@ export default class LayerMarkPlugin extends Plugin {
     this.longPressStart = null;
   }
 
+  private suppressNativeContextMenuAfterLongPress(event: MouseEvent): void {
+    if (!shouldSuppressNativeContextMenu(this.nativeContextMenuSuppressedAt, Date.now())) {
+      return;
+    }
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (!target || !this.findPotentialAnnotatedImageTarget(target)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
   private findPotentialAnnotatedImageTarget(target: HTMLElement): HTMLImageElement | null {
-    const wrapper = target.closest<HTMLElement>(".skitch-layer-wrapper");
+    const wrapper = target.closest<HTMLElement>(".layermark-wrapper");
     return wrapper?.querySelector<HTMLImageElement>("img") ?? target.closest<HTMLImageElement>("img");
   }
 
@@ -439,7 +457,7 @@ export default class LayerMarkPlugin extends Plugin {
     target: HTMLElement,
     position: { x: number; y: number; mouseEvent?: MouseEvent }
   ): Promise<void> {
-    const wrapper = target?.closest<HTMLElement>(".skitch-layer-wrapper") ?? null;
+    const wrapper = target?.closest<HTMLElement>(".layermark-wrapper") ?? null;
     const image = wrapper?.querySelector<HTMLImageElement>("img") ?? (target?.closest<HTMLImageElement>("img") ?? null);
     if (!image) {
       return;
@@ -538,7 +556,7 @@ export default class LayerMarkPlugin extends Plugin {
     const cleared = putFabricJson({ ...annotation, objects: [] }, { version: "7.4.0", objects: [] });
     await this.storage.save(cleared);
     await this.storage.deletePreview(annotation.imagePath);
-    wrapper?.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    wrapper?.querySelectorAll(":scope > .layermark-overlay, :scope > .layermark-fabric-overlay").forEach((overlay) => overlay.remove());
     const originalFile = this.app.vault.getAbstractFileByPath(annotation.imagePath);
     if (originalFile instanceof TFile) {
       image.src = this.app.vault.getResourcePath(originalFile);
@@ -563,7 +581,7 @@ export default class LayerMarkPlugin extends Plugin {
     const selection = document.getSelection();
     if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
-      const selectedWrappers = Array.from(document.querySelectorAll<HTMLElement>(".skitch-layer-wrapper"))
+      const selectedWrappers = Array.from(document.querySelectorAll<HTMLElement>(".layermark-wrapper"))
         .filter((wrapper) => range.intersectsNode(wrapper));
       if (selectedWrappers.length === 1 && selection.toString().trim().length === 0) {
         return selectedWrappers[0];
@@ -572,7 +590,7 @@ export default class LayerMarkPlugin extends Plugin {
     }
 
     const target = event.target instanceof HTMLElement ? event.target : null;
-    return target?.closest<HTMLElement>(".skitch-layer-wrapper") ?? document.querySelector<HTMLElement>(".skitch-layer-wrapper:hover");
+    return target?.closest<HTMLElement>(".layermark-wrapper") ?? document.querySelector<HTMLElement>(".layermark-wrapper:hover");
   }
 
   private resolveImageFile(image: HTMLImageElement, sourcePath: string): TFile | null {
@@ -648,7 +666,7 @@ class SkitchImageRenderChild extends MarkdownRenderChild {
   }
 
   onunload(): void {
-    this.wrapper.querySelectorAll(":scope > .skitch-layer-overlay, :scope > .skitch-layer-fabric-overlay").forEach((overlay) => overlay.remove());
+    this.wrapper.querySelectorAll(":scope > .layermark-overlay, :scope > .layermark-fabric-overlay").forEach((overlay) => overlay.remove());
     this.revokeRuntimePreviewUrl(this.image.dataset.skitchRuntimePreviewUrl);
     this.image.dataset.skitchRuntimePreviewUrl = "";
     const originalSrc = this.image.dataset.skitchOriginalSrc;

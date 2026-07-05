@@ -89,14 +89,14 @@ export class AnnotationEditorModal extends Modal {
   async onOpen(): Promise<void> {
     const imageSize = await this.measureImage();
     this.document = await this.storage.loadOrCreate(this.imageFile, imageSize);
-    this.modalEl.addClass("skitch-layer-modal-container");
+    this.modalEl.addClass("layermark-modal-container");
     this.contentEl.empty();
-    this.contentEl.addClass("skitch-layer-modal");
+    this.contentEl.addClass("layermark-modal");
 
-    const toolbar = this.contentEl.createDiv({ cls: "skitch-layer-toolbar" });
-    toolbar.createDiv({ cls: "skitch-layer-toolbar-title", text: this.imageFile.name });
-    const palette = toolbar.createDiv({ cls: "skitch-layer-tool-palette" });
-    this.toolGroupEl = palette.createDiv({ cls: "skitch-layer-tool-group" });
+    const toolbar = this.contentEl.createDiv({ cls: "layermark-toolbar" });
+    toolbar.createDiv({ cls: "layermark-toolbar-title", text: this.imageFile.name });
+    const palette = toolbar.createDiv({ cls: "layermark-tool-palette" });
+    this.toolGroupEl = palette.createDiv({ cls: "layermark-tool-group" });
     this.addToolButton(this.toolGroupEl, "select", "\uc120\ud0dd", "mouse-pointer-2", "1");
     this.addToolButton(this.toolGroupEl, "pen", "\ud39c", "pen-line", "2");
     this.addToolButton(this.toolGroupEl, "text", "\ud14d\uc2a4\ud2b8", "type", "3");
@@ -105,9 +105,9 @@ export class AnnotationEditorModal extends Modal {
     this.addToolButton(this.toolGroupEl, "ellipse", "\uc6d0", "circle", "6");
     this.addToolButton(this.toolGroupEl, "arrow", "\ud654\uc0b4\ud45c", "arrow-up-right", "7");
     this.addToolButton(this.toolGroupEl, "badge", "\ubc30\uc9c0", "badge-check", "8");
-    this.addStyleControls(palette.createDiv({ cls: "skitch-layer-style-controls" }));
-    this.addBadgeNumberControls(palette.createDiv({ cls: "skitch-layer-badge-number-controls" }));
-    const actions = new Setting(toolbar.createDiv({ cls: "skitch-layer-actions" }));
+    this.addStyleControls(palette.createDiv({ cls: "layermark-style-controls" }));
+    this.addBadgeNumberControls(palette.createDiv({ cls: "layermark-badge-number-controls" }));
+    const actions = new Setting(toolbar.createDiv({ cls: "layermark-actions" }));
     actions.addButton((button) => {
       button.setButtonText("Delete").onClick(() => this.deleteSelection());
     });
@@ -117,7 +117,7 @@ export class AnnotationEditorModal extends Modal {
     actions.addButton((button) => {
       button.setButtonText("-").onClick(() => this.setZoom(this.zoom / 1.2));
     });
-    this.zoomLabelEl = actions.controlEl.createSpan({ cls: "skitch-layer-zoom-label", text: "100%" });
+    this.zoomLabelEl = actions.controlEl.createSpan({ cls: "layermark-zoom-label", text: "100%" });
     actions.addButton((button) => {
       button.setButtonText("+").onClick(() => this.setZoom(this.zoom * 1.2));
     });
@@ -130,17 +130,17 @@ export class AnnotationEditorModal extends Modal {
       });
     });
 
-    this.stageEl = this.contentEl.createDiv({ cls: "skitch-layer-stage skitch-layer-fabric-stage" });
-    this.frameEl = this.stageEl.createDiv({ cls: "skitch-layer-canvas-frame" });
+    this.stageEl = this.contentEl.createDiv({ cls: "layermark-stage layermark-fabric-stage" });
+    this.frameEl = this.stageEl.createDiv({ cls: "layermark-canvas-frame" });
     const imageEl = this.frameEl.createEl("img", {
-      cls: "skitch-layer-editor-image",
+      cls: "layermark-editor-image",
       attr: {
         src: this.app.vault.getResourcePath(this.imageFile),
         alt: this.imageFile.basename
       }
     });
     imageEl.draggable = false;
-    this.fabricCanvasEl = this.frameEl.createEl("canvas", { cls: "skitch-layer-fabric-canvas" });
+    this.fabricCanvasEl = this.frameEl.createEl("canvas", { cls: "layermark-fabric-canvas" });
     this.fabricCanvasEl.width = imageSize.width;
     this.fabricCanvasEl.height = imageSize.height;
 
@@ -182,13 +182,13 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private addToolButton(toolbar: HTMLElement, tool: EditorTool, label: string, icon: string, shortcut: string): void {
-    const button = toolbar.createEl("button", { cls: "skitch-layer-tool-button clickable-icon" });
+    const button = toolbar.createEl("button", { cls: "layermark-tool-button clickable-icon" });
     button.type = "button";
     button.dataset.tool = tool;
     button.title = `${label} (${shortcut})`;
-    const iconEl = button.createSpan({ cls: "skitch-layer-tool-icon" });
+    const iconEl = button.createSpan({ cls: "layermark-tool-icon" });
     setIcon(iconEl, icon);
-    button.createSpan({ cls: "skitch-layer-tool-label", text: label });
+    button.createSpan({ cls: "layermark-tool-label", text: label });
     button.addEventListener("click", () => {
       this.setTool(tool);
     });
@@ -198,7 +198,12 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private addStyleControls(container: HTMLElement): void {
-    const color = container.createEl("input", { cls: "skitch-layer-color-input" });
+    const drawOptions = container.createDiv({ cls: "layermark-style-section layermark-draw-options" });
+    drawOptions.createSpan({ cls: "layermark-style-section-label", text: "Draw" });
+    const textOptions = container.createDiv({ cls: "layermark-style-section layermark-text-options" });
+    textOptions.createSpan({ cls: "layermark-style-section-label", text: "Text" });
+
+    const color = drawOptions.createEl("input", { cls: "layermark-color-input" });
     color.type = "color";
     color.value = this.style.color;
     color.title = "Color";
@@ -207,9 +212,9 @@ export class AnnotationEditorModal extends Modal {
     });
     this.colorInputEl = color;
 
-    const presets = container.createDiv({ cls: "skitch-layer-color-presets" });
+    const presets = drawOptions.createDiv({ cls: "layermark-color-presets" });
     for (const preset of MARKUP_COLOR_PRESETS) {
-      const swatch = presets.createEl("button", { cls: "skitch-layer-color-swatch" });
+      const swatch = presets.createEl("button", { cls: "layermark-color-swatch" });
       swatch.type = "button";
       swatch.title = preset.label;
       swatch.ariaLabel = preset.label;
@@ -218,7 +223,7 @@ export class AnnotationEditorModal extends Modal {
       swatch.addEventListener("click", () => this.setStyleColor(preset.value));
     }
 
-    const stroke = container.createEl("input", { cls: "skitch-layer-width-input" });
+    const stroke = drawOptions.createEl("input", { cls: "layermark-width-input" });
     stroke.type = "range";
     stroke.min = "1";
     stroke.max = "32";
@@ -232,7 +237,7 @@ export class AnnotationEditorModal extends Modal {
     });
     this.strokeInputEl = stroke;
 
-    const fontSize = container.createEl("input", { cls: "skitch-layer-font-size-input" });
+    const fontSize = textOptions.createEl("input", { cls: "layermark-font-size-input" });
     fontSize.type = "number";
     fontSize.min = "12";
     fontSize.max = "220";
@@ -248,9 +253,9 @@ export class AnnotationEditorModal extends Modal {
     });
     this.fontSizeInputEl = fontSize;
 
-    const textSizePresets = container.createDiv({ cls: "skitch-layer-text-size-presets" });
+    const textSizePresets = textOptions.createDiv({ cls: "layermark-text-size-presets" });
     for (const preset of TEXT_SIZE_PRESETS) {
-      const button = textSizePresets.createEl("button", { cls: "skitch-layer-text-size-button", text: preset.label });
+      const button = textSizePresets.createEl("button", { cls: "layermark-text-size-button", text: preset.label });
       button.type = "button";
       button.title = `Text ${preset.value}px`;
       button.dataset.fontSize = String(preset.value);
@@ -269,7 +274,7 @@ export class AnnotationEditorModal extends Modal {
     }
     this.syncTextSizePresetState();
 
-    const fontFamily = container.createEl("select", { cls: "skitch-layer-font-family-input" });
+    const fontFamily = textOptions.createEl("select", { cls: "layermark-font-family-input" });
     fontFamily.title = "Text font";
     for (const [label, value] of [
       ["\uae30\ubcf8", DEFAULT_TEXT_FONT_FAMILY],
@@ -286,7 +291,7 @@ export class AnnotationEditorModal extends Modal {
     });
     this.fontFamilySelectEl = fontFamily;
 
-    const bold = container.createEl("button", { cls: "skitch-layer-bold-button", text: "B" });
+    const bold = textOptions.createEl("button", { cls: "layermark-bold-button", text: "B" });
     bold.type = "button";
     bold.title = "Bold text";
     bold.toggleClass("is-active", this.textBold);
@@ -300,14 +305,14 @@ export class AnnotationEditorModal extends Modal {
 
   private addBadgeNumberControls(container: HTMLElement): void {
     this.badgeNumberControlEl = container;
-    container.createSpan({ cls: "skitch-layer-badge-number-label", text: "\ubc30\uc9c0" });
+    container.createSpan({ cls: "layermark-badge-number-label", text: "\ubc30\uc9c0" });
 
-    const decrease = container.createEl("button", { cls: "skitch-layer-badge-number-button", text: "-" });
+    const decrease = container.createEl("button", { cls: "layermark-badge-number-button", text: "-" });
     decrease.type = "button";
     decrease.title = "Previous badge number";
     decrease.addEventListener("click", () => this.setNextBadgeNumber(this.settings.nextBadgeNumber - 1));
 
-    const input = container.createEl("input", { cls: "skitch-layer-badge-number-input" });
+    const input = container.createEl("input", { cls: "layermark-badge-number-input" });
     input.type = "number";
     input.min = "1";
     input.step = "1";
@@ -315,12 +320,12 @@ export class AnnotationEditorModal extends Modal {
     input.addEventListener("change", () => this.setNextBadgeNumber(Number(input.value)));
     this.badgeNumberInputEl = input;
 
-    const increase = container.createEl("button", { cls: "skitch-layer-badge-number-button", text: "+" });
+    const increase = container.createEl("button", { cls: "layermark-badge-number-button", text: "+" });
     increase.type = "button";
     increase.title = "Next badge number";
     increase.addEventListener("click", () => this.setNextBadgeNumber(this.settings.nextBadgeNumber + 1));
 
-    const restart = container.createEl("button", { cls: "skitch-layer-badge-number-reset", text: "1" });
+    const restart = container.createEl("button", { cls: "layermark-badge-number-reset", text: "1" });
     restart.type = "button";
     restart.title = "Restart badges at 1";
     restart.addEventListener("click", () => this.setNextBadgeNumber(1));
@@ -361,7 +366,7 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private syncTextSizePresetState(): void {
-    this.contentEl.querySelectorAll<HTMLElement>(".skitch-layer-text-size-button").forEach((button) => {
+    this.contentEl.querySelectorAll<HTMLElement>(".layermark-text-size-button").forEach((button) => {
       button.toggleClass("is-active", Number(button.dataset.fontSize) === this.style.fontSize);
     });
   }
@@ -814,7 +819,7 @@ export class AnnotationEditorModal extends Modal {
     editingObject?.set({ visible: false } as Partial<Textbox>);
     this.textEditorPoint = point;
     this.textEditorObject = editingObject ?? null;
-    const editor = this.frameEl.createEl("textarea", { cls: "skitch-layer-text-editor" });
+    const editor = this.frameEl.createEl("textarea", { cls: "layermark-text-editor" });
     editor.value = initialText;
     editor.placeholder = "\ud14d\uc2a4\ud2b8 \uc785\ub825";
     editor.enterKeyHint = "done";

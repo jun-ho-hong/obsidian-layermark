@@ -10,7 +10,7 @@ type FabricJson = {
 
 export function createOverlaySvgMarkup(document: AnnotationDocument): string {
   const body = document.objects.map((annotation) => renderAnnotation(annotation, document.imageSize)).join("");
-  return `<svg class="skitch-layer-overlay" viewBox="0 0 ${document.imageSize.width} ${document.imageSize.height}" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="skitch-arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M2,2 L10,6 L2,10 Z" fill="context-stroke"></path></marker></defs>${body}</svg>`;
+  return `<svg class="layermark-overlay" viewBox="0 0 ${document.imageSize.width} ${document.imageSize.height}" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="skitch-arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M2,2 L10,6 L2,10 Z" fill="context-stroke"></path></marker></defs>${body}</svg>`;
 }
 
 export function attachOverlay(container: HTMLElement, document: AnnotationDocument): SVGSVGElement {
@@ -41,7 +41,7 @@ export async function attachFabricOverlay(container: HTMLElement, document: Anno
   }
 
   const canvasElement = container.ownerDocument.createElement("canvas");
-  canvasElement.addClass("skitch-layer-fabric-overlay");
+  canvasElement.addClass("layermark-fabric-overlay");
   canvasElement.width = document.imageSize.width;
   canvasElement.height = document.imageSize.height;
   container.appendChild(canvasElement);

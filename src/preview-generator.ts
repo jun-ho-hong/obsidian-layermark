@@ -3,7 +3,7 @@ import { createOverlaySvgMarkup } from "./render-overlay";
 
 export function createPreviewSvg(document: AnnotationDocument, imageHref: string): string {
   const overlay = createOverlaySvgMarkup(document)
-    .replace('<svg class="skitch-layer-overlay"', '<g class="skitch-layer-overlay"')
+    .replace('<svg class="layermark-overlay"', '<g class="layermark-overlay"')
     .replace(/ viewBox="[^"]+"/, "")
     .replace(/ preserveAspectRatio="[^"]+"/, "")
     .replace(/ aria-hidden="[^"]+"/, "")

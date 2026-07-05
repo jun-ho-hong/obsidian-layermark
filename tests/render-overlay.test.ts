@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createOverlaySvgMarkup } from "../src/render-overlay";
 import type { AnnotationDocument } from "../src/annotation-model";
 
@@ -33,7 +33,7 @@ describe("overlay SVG markup", () => {
     const markup = createOverlaySvgMarkup(document);
 
     expect(markup).toContain('viewBox="0 0 1000 500"');
-    expect(markup).toContain('class="skitch-layer-overlay"');
+    expect(markup).toContain('class="layermark-overlay"');
   });
 
   it("renders arrows and text without mutating the source image", () => {

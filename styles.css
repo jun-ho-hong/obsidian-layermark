@@ -1,15 +1,15 @@
-.skitch-layer-wrapper {
+.layermark-wrapper {
   display: inline-block;
   position: relative;
   max-width: 100%;
   line-height: 0;
 }
 
-.skitch-layer-wrapper > img {
+.layermark-wrapper > img {
   display: block;
 }
 
-.skitch-layer-overlay {
+.layermark-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -18,7 +18,7 @@
   overflow: visible;
 }
 
-.skitch-layer-fabric-overlay {
+.layermark-fabric-overlay {
   position: absolute;
   inset: 0;
   width: 100% !important;
@@ -26,12 +26,12 @@
   pointer-events: none;
 }
 
-.skitch-layer-modal-container {
+.layermark-modal-container {
   width: min(1480px, 98vw);
   max-width: 98vw;
 }
 
-.skitch-layer-modal {
+.layermark-modal {
   --layermark-accent: #0d9488;
   --layermark-accent-strong: #0f766e;
   --layermark-action: #ea580c;
@@ -47,7 +47,7 @@
   color: var(--text-normal);
 }
 
-.skitch-layer-toolbar {
+.layermark-toolbar {
   display: grid;
   grid-template-columns: minmax(80px, 180px) minmax(0, 1fr) auto;
   gap: 16px;
@@ -57,7 +57,7 @@
   position: relative;
 }
 
-.skitch-layer-toolbar-title {
+.layermark-toolbar-title {
   min-width: 0;
   max-width: 220px;
   overflow: hidden;
@@ -71,7 +71,7 @@
   white-space: nowrap;
 }
 
-.skitch-layer-tool-palette {
+.layermark-tool-palette {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -86,7 +86,7 @@
   box-shadow: none;
 }
 
-.skitch-layer-tool-group {
+.layermark-tool-group {
   display: flex;
   gap: 2px;
   align-items: stretch;
@@ -94,7 +94,7 @@
   flex-wrap: wrap;
 }
 
-.skitch-layer-tool-group button {
+.layermark-tool-group button {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -113,7 +113,7 @@
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-.skitch-layer-tool-icon {
+.layermark-tool-icon {
   display: flex;
   width: 20px;
   height: 20px;
@@ -121,16 +121,16 @@
   justify-content: center;
 }
 
-.skitch-layer-tool-label {
+.layermark-tool-label {
   white-space: nowrap;
 }
 
-.skitch-layer-tool-group button.is-active {
+.layermark-tool-group button.is-active {
   background: var(--layermark-accent);
   color: #ffffff;
 }
 
-.skitch-layer-style-controls {
+.layermark-style-controls {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -140,7 +140,33 @@
   border-left: 1px solid var(--layermark-line);
 }
 
-.skitch-layer-color-input {
+.layermark-style-section {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.layermark-style-section-label {
+  color: var(--layermark-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.layermark-draw-options {
+  padding-right: 8px;
+  border-right: 1px solid var(--layermark-line);
+}
+
+.layermark-text-options {
+  min-width: 0;
+}
+
+.layermark-color-input {
   width: 30px;
   height: 30px;
   padding: 2px;
@@ -149,13 +175,13 @@
   background: transparent;
 }
 
-.skitch-layer-color-presets {
+.layermark-color-presets {
   display: flex;
   gap: 4px;
   align-items: center;
 }
 
-.skitch-layer-color-swatch {
+.layermark-color-swatch {
   width: 22px;
   height: 22px;
   min-width: 22px;
@@ -165,24 +191,24 @@
   box-shadow: none;
 }
 
-.skitch-layer-color-swatch:hover,
-.skitch-layer-color-swatch:focus-visible {
+.layermark-color-swatch:hover,
+.layermark-color-swatch:focus-visible {
   outline: 2px solid var(--layermark-accent);
   outline-offset: 2px;
 }
 
-.skitch-layer-width-input {
+.layermark-width-input {
   width: 72px;
 }
 
-.skitch-layer-font-size-input {
+.layermark-font-size-input {
   width: 56px;
   height: 30px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.skitch-layer-text-size-presets {
+.layermark-text-size-presets {
   display: flex;
   gap: 2px;
   align-items: center;
@@ -191,7 +217,7 @@
   border-radius: 4px;
 }
 
-.skitch-layer-text-size-button {
+.layermark-text-size-button {
   min-width: 32px;
   height: 26px;
   padding: 0 7px;
@@ -203,18 +229,18 @@
   font-weight: 700;
 }
 
-.skitch-layer-text-size-button.is-active {
+.layermark-text-size-button.is-active {
   background: var(--layermark-ink);
   color: #ffffff;
 }
 
-.skitch-layer-font-family-input {
+.layermark-font-family-input {
   width: 66px;
   height: 30px;
   font-size: 12px;
 }
 
-.skitch-layer-bold-button {
+.layermark-bold-button {
   width: 30px;
   height: 30px;
   padding: 0;
@@ -222,13 +248,13 @@
   font-weight: 800;
 }
 
-.skitch-layer-bold-button.is-active {
+.layermark-bold-button.is-active {
   background: var(--layermark-accent);
   color: #ffffff;
 }
 
 
-.skitch-layer-badge-number-controls {
+.layermark-badge-number-controls {
   display: none;
   gap: 4px;
   align-items: center;
@@ -236,25 +262,25 @@
   border-left: 1px solid var(--layermark-line);
 }
 
-.skitch-layer-badge-number-controls.is-visible {
+.layermark-badge-number-controls.is-visible {
   display: flex;
 }
 
-.skitch-layer-badge-number-label {
+.layermark-badge-number-label {
   color: var(--layermark-muted);
   font-size: 11px;
   font-weight: 600;
 }
 
-.skitch-layer-badge-number-input {
+.layermark-badge-number-input {
   width: 54px;
   height: 30px;
   font-size: 12px;
   text-align: center;
 }
 
-.skitch-layer-badge-number-button,
-.skitch-layer-badge-number-reset {
+.layermark-badge-number-button,
+.layermark-badge-number-reset {
   width: 30px;
   height: 30px;
   padding: 0;
@@ -262,38 +288,38 @@
   font-size: 13px;
   font-weight: 700;
 }
-.skitch-layer-actions {
+.layermark-actions {
   min-width: max-content;
   margin-left: 0;
   border: 0;
   align-self: start;
 }
 
-.skitch-layer-actions .setting-item {
+.layermark-actions .setting-item {
   padding: 0;
   border: 0;
 }
 
-.skitch-layer-actions .setting-item-control {
+.layermark-actions .setting-item-control {
   gap: 8px;
   flex-wrap: nowrap;
 }
 
-.skitch-layer-actions button {
+.layermark-actions button {
   height: 32px;
   border-radius: 4px;
 }
 
-.skitch-layer-actions button.mod-cta {
+.layermark-actions button.mod-cta {
   background: var(--layermark-ink);
   color: #ffffff;
 }
 
-.skitch-layer-actions button.mod-cta:hover {
+.layermark-actions button.mod-cta:hover {
   background: var(--layermark-accent-strong);
 }
 
-.skitch-layer-zoom-label {
+.layermark-zoom-label {
   min-width: 44px;
   color: var(--layermark-muted);
   font-size: 12px;
@@ -301,7 +327,7 @@
   text-align: center;
 }
 
-.skitch-layer-stage {
+.layermark-stage {
   flex: 1;
   min-height: 360px;
   overflow: auto;
@@ -313,19 +339,19 @@
   user-select: none;
 }
 
-.skitch-layer-stage-inner {
+.layermark-stage-inner {
   position: relative;
   display: inline-block;
   line-height: 0;
 }
 
-.skitch-layer-stage-inner img {
+.layermark-stage-inner img {
   display: block;
   max-width: 100%;
   height: auto;
 }
 
-.skitch-layer-drawing-surface {
+.layermark-drawing-surface {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -333,17 +359,17 @@
   cursor: crosshair;
 }
 
-.skitch-layer-fabric-stage {
+.layermark-fabric-stage {
   display: block;
   padding: 24px;
   touch-action: none;
 }
 
-.skitch-layer-fabric-stage.is-panning {
+.layermark-fabric-stage.is-panning {
   cursor: grabbing;
 }
 
-.skitch-layer-fabric-stage .canvas-container {
+.layermark-fabric-stage .canvas-container {
   position: absolute !important;
   inset: 0;
   border-radius: 4px;
@@ -353,7 +379,7 @@
   flex: none;
 }
 
-.skitch-layer-canvas-frame {
+.layermark-canvas-frame {
   position: relative;
   flex: 0 0 auto;
   overflow: hidden;
@@ -364,7 +390,7 @@
   box-shadow: 0 18px 40px rgba(17, 24, 39, 0.1);
 }
 
-.skitch-layer-text-editor {
+.layermark-text-editor {
   position: absolute;
   z-index: 20;
   min-width: 140px;
@@ -382,12 +408,12 @@
   white-space: pre-wrap;
 }
 
-.skitch-layer-text-editor::placeholder {
+.layermark-text-editor::placeholder {
   color: currentColor;
   opacity: 0.55;
 }
 
-.skitch-layer-editor-image {
+.layermark-editor-image {
   position: absolute;
   inset: 0;
   display: block;
@@ -398,32 +424,32 @@
   pointer-events: none;
 }
 
-.skitch-layer-fabric-canvas {
+.layermark-fabric-canvas {
   display: block;
 }
 
 @media (max-width: 700px) {
-  .skitch-layer-modal-container {
+  .layermark-modal-container {
     width: 100vw;
     max-width: 100vw;
   }
 
-  .skitch-layer-modal {
+  .layermark-modal {
     height: min(100dvh, 100vh);
   }
 
-  .skitch-layer-toolbar {
+  .layermark-toolbar {
     grid-template-columns: 1fr;
     gap: 8px;
     padding: 10px 0 12px;
   }
 
-  .skitch-layer-toolbar-title {
+  .layermark-toolbar-title {
     max-width: 100%;
     padding: 0 4px;
   }
 
-  .skitch-layer-tool-palette {
+  .layermark-tool-palette {
     width: 100%;
     max-width: 100%;
     overflow-x: auto;
@@ -433,46 +459,47 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .skitch-layer-tool-group,
-  .skitch-layer-style-controls,
-  .skitch-layer-color-presets,
-  .skitch-layer-badge-number-controls.is-visible {
+  .layermark-tool-group,
+  .layermark-style-controls,
+  .layermark-style-section,
+  .layermark-color-presets,
+  .layermark-badge-number-controls.is-visible {
     flex-wrap: nowrap;
   }
 
-  .skitch-layer-style-controls,
-  .skitch-layer-badge-number-controls {
+  .layermark-style-controls,
+  .layermark-badge-number-controls {
     flex: 0 0 auto;
   }
 
-  .skitch-layer-tool-group button,
-  .skitch-layer-actions button,
-  .skitch-layer-badge-number-button,
-  .skitch-layer-badge-number-reset,
-  .skitch-layer-bold-button {
+  .layermark-tool-group button,
+  .layermark-actions button,
+  .layermark-badge-number-button,
+  .layermark-badge-number-reset,
+  .layermark-bold-button {
     min-width: 44px;
     min-height: 44px;
     touch-action: manipulation;
   }
 
-  .skitch-layer-actions {
+  .layermark-actions {
     width: 100%;
     max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  .skitch-layer-actions .setting-item-control {
+  .layermark-actions .setting-item-control {
     justify-content: flex-start;
     min-width: max-content;
   }
 
-  .skitch-layer-stage {
+  .layermark-stage {
     min-height: 240px;
     margin-top: 10px;
   }
 
-  .skitch-layer-fabric-stage {
+  .layermark-fabric-stage {
     padding: 12px;
   }
 }

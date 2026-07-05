@@ -6,9 +6,9 @@ const css = readFileSync("styles.css", "utf8");
 describe("mobile editor layout CSS", () => {
   it("has a dedicated small-screen toolbar layout", () => {
     expect(css).toContain("@media (max-width: 700px)");
-    expect(css).toContain(".skitch-layer-toolbar");
+    expect(css).toContain(".layermark-toolbar");
     expect(css).toContain("grid-template-columns: 1fr");
-    expect(css).toContain(".skitch-layer-tool-palette");
+    expect(css).toContain(".layermark-tool-palette");
     expect(css).toContain("overflow-x: auto");
   });
 
@@ -19,7 +19,7 @@ describe("mobile editor layout CSS", () => {
   });
 
   it("reserves the fabric stage for custom touch gestures", () => {
-    expect(css).toContain(".skitch-layer-fabric-stage");
+    expect(css).toContain(".layermark-fabric-stage");
     expect(css).toContain("touch-action: none");
   });
 });

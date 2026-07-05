@@ -12,7 +12,7 @@ describe("mobile text input affordances", () => {
   });
 
   it("keeps the text editor at a mobile-safe font size", () => {
-    expect(css).toContain(".skitch-layer-text-editor");
+    expect(css).toContain(".layermark-text-editor");
     expect(css).toContain("font-size: max(16px, 1em)");
   });
 });
