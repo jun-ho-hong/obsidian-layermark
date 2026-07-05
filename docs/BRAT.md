@@ -5,7 +5,7 @@ This plugin can be tested through BRAT before it is submitted to the official Ob
 ## Repository
 
 ```text
-https://github.com/jun-ho-hong/obsidian-skitch-layer
+https://github.com/jun-ho-hong/obsidian-layermark
 ```
 
 ## Release requirements
@@ -26,14 +26,14 @@ For example, if `manifest.json` contains:
 
 ```json
 {
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
 ```
 
 then the GitHub Release tag should be:
 
 ```text
-0.1.0
+v0.2.0
 ```
 
 ## Before creating a release
@@ -53,10 +53,10 @@ This verifies TypeScript, tests, build output, and the required release files.
 3. Enter:
 
 ```text
-jun-ho-hong/obsidian-skitch-layer
+jun-ho-hong/obsidian-layermark
 ```
 
-4. Enable `Skitch Layer` in Obsidian community plugins.
+4. Enable `LayerMark` in Obsidian community plugins.
 
 ## Mac and iOS QA checklist
 
@@ -73,4 +73,4 @@ Run this checklist separately on macOS and iOS:
 
 ## Known beta caveat
 
-This plugin stores editable annotation data next to the image as `<image>.skitch.json` and generated previews as `<image>.skitch.png`. Sync tools must sync those sidecar files with the original image.
+This plugin stores editable annotation data next to the image as `<image>.layermark.json` and generated previews as `<image>.layermark.png`. Existing beta files using `.skitch.json` and `.skitch.png` remain readable. Sync tools must sync those sidecar files with the original image.

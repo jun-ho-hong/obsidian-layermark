@@ -15,7 +15,7 @@ describe("render policy", () => {
     expect(getImageRenderDecision("assets/YYHNvj/01.jpg", annotation, true)).toEqual({
       mode: "preview",
       originalImagePath: "assets/YYHNvj/01.jpg",
-      previewImagePath: "assets/YYHNvj/01.jpg.skitch.png"
+      previewImagePath: "assets/YYHNvj/01.jpg.layermark.png"
     });
   });
 
@@ -34,6 +34,10 @@ describe("render policy", () => {
   });
 
   it("does not recursively replace a generated preview image", () => {
+    expect(getImageRenderDecision("assets/YYHNvj/01.jpg.layermark.png", annotation, true)).toEqual({
+      mode: "original",
+      originalImagePath: "assets/YYHNvj/01.jpg.layermark.png"
+    });
     expect(getImageRenderDecision("assets/YYHNvj/01.jpg.skitch.png", annotation, true)).toEqual({
       mode: "original",
       originalImagePath: "assets/YYHNvj/01.jpg.skitch.png"

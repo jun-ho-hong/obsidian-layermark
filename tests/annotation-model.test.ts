@@ -8,8 +8,8 @@ import {
 
 describe("annotation model", () => {
   it("stores annotation sidecars next to the original image", () => {
-    expect(getSidecarAnnotationPath("Attachments/example.png")).toBe("Attachments/example.png.skitch.json");
-    expect(getSidecarAnnotationPath("example.image.jpg")).toBe("example.image.jpg.skitch.json");
+    expect(getSidecarAnnotationPath("Attachments/example.png")).toBe("Attachments/example.png.layermark.json");
+    expect(getSidecarAnnotationPath("example.image.jpg")).toBe("example.image.jpg.layermark.json");
   });
 
   it("normalizes and denormalizes points against image dimensions", () => {

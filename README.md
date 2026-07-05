@@ -1,14 +1,14 @@
-# Skitch Layer
+# LayerMark
 
-Skitch Layer adds non-destructive, Skitch-style image annotations to Obsidian.
+LayerMark adds non-destructive image markup layers to Obsidian.
 
 It keeps the original image file unchanged, stores editable annotation data in a sidecar JSON file, and renders an annotated view in notes when the plugin is enabled.
 
 ## Features
 
 - Non-destructive annotations for normal Obsidian image embeds.
-- Editable sidecar data stored next to the source image as `<image>.skitch.json`.
-- Generated preview image stored as `<image>.skitch.png` for copy/export workflows.
+- Editable sidecar data stored next to the source image as `<image>.layermark.json`.
+- Generated preview image stored as `<image>.layermark.png` for copy/export workflows.
 - Tools for select, pen, text, highlight, rectangle, ellipse, arrow, and numbered badges.
 - Reading mode rendering with flattened preview fallback and editable source data.
 - Context menu actions for annotating, copying the annotated image, and clearing annotations.
@@ -31,14 +31,14 @@ For an image at:
 Attachments/example.png
 ```
 
-Skitch Layer stores:
+LayerMark stores:
 
 ```text
-Attachments/example.png.skitch.json
-Attachments/example.png.skitch.png
+Attachments/example.png.layermark.json
+Attachments/example.png.layermark.png
 ```
 
-The JSON file is the editable source of truth. The PNG file is a generated preview for display and clipboard workflows.
+The JSON file is the editable source of truth. The PNG file is a generated preview for display and clipboard workflows. Existing beta files using `.skitch.json` and `.skitch.png` remain readable for migration.
 
 ## Local installation
 
@@ -47,10 +47,10 @@ The JSON file is the editable source of truth. The PNG file is a generated previ
 3. Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 ```text
-<your-vault>/.obsidian/plugins/skitch-layer/
+<your-vault>/.obsidian/plugins/layermark/
 ```
 
-4. Enable `Skitch Layer` in Obsidian community plugins.
+4. Enable `LayerMark` in Obsidian community plugins.
 
 ## BRAT beta installation
 

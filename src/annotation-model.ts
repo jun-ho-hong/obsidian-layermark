@@ -86,7 +86,7 @@ export type SvgGeometry =
     };
 
 export function getSidecarAnnotationPath(imagePath: string): string {
-  return `${imagePath}.skitch.json`;
+  return `${imagePath}.layermark.json`;
 }
 
 export function normalizePoint(point: Point, imageSize: ImageSize): Point {

@@ -29,7 +29,7 @@ import {
 import { calculateFitZoom, clampZoom, formatZoomPercent } from "./editor-viewport";
 import { removeAllFabricObjects, serializeFabricScene } from "./fabric-serialization";
 import { createInteractiveCanvasOptions } from "./mobile-compat";
-import type { SkitchLayerSettings } from "./settings";
+import type { LayerMarkSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 import {
   calculateTouchViewport,
@@ -75,8 +75,8 @@ export class AnnotationEditorModal extends Modal {
     app: App,
     private readonly imageFile: TFile,
     private readonly storage: AnnotationStorage,
-    private settings: SkitchLayerSettings,
-    private readonly onSave?: (document: AnnotationDocument, settings: SkitchLayerSettings) => void | Promise<void>
+    private settings: LayerMarkSettings,
+    private readonly onSave?: (document: AnnotationDocument, settings: LayerMarkSettings) => void | Promise<void>
   ) {
     super(app);
     this.style = {
@@ -1075,8 +1075,8 @@ export class AnnotationEditorModal extends Modal {
   }
 
   private showSaveError(error: unknown): void {
-    console.error("Skitch Layer save failed", error);
-    new Notice(error instanceof Error ? `Skitch save failed: ${error.message}` : "Skitch save failed");
+    console.error("LayerMark save failed", error);
+    new Notice(error instanceof Error ? `LayerMark save failed: ${error.message}` : "LayerMark save failed");
   }
 
   private async savePreviewBestEffort(document: AnnotationDocument): Promise<void> {
@@ -1089,7 +1089,7 @@ export class AnnotationEditorModal extends Modal {
       const previewBytes = await previewBlob.arrayBuffer();
       await this.storage.savePreview(document.imagePath, previewBytes);
     } catch (error) {
-      console.warn("Skitch Layer saved annotation data but failed to render preview PNG", error);
+      console.warn("LayerMark saved annotation data but failed to render preview PNG", error);
       new Notice("Annotation saved. Preview will refresh with overlay rendering.");
     }
   }

@@ -1,9 +1,9 @@
 {
-  "id": "skitch-layer",
-  "name": "Skitch Layer",
-  "version": "0.1.0",
+  "id": "layermark",
+  "name": "LayerMark",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
-  "description": "Non-destructive Skitch-style image annotations for Obsidian images.",
+  "description": "Non-destructive image markup layers for Obsidian images.",
   "author": "Jun Ho Hong",
   "authorUrl": "https://github.com/jun-ho-hong",
   "isDesktopOnly": false

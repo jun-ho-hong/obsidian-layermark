@@ -32,6 +32,13 @@
 }
 
 .skitch-layer-modal {
+  --layermark-accent: #0d9488;
+  --layermark-accent-strong: #0f766e;
+  --layermark-ink: #111827;
+  --layermark-muted: #6b7280;
+  --layermark-line: rgba(17, 24, 39, 0.16);
+  --layermark-surface: var(--background-primary);
+  --layermark-surface-subtle: var(--background-secondary);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -42,10 +49,10 @@
 .skitch-layer-toolbar {
   display: grid;
   grid-template-columns: minmax(80px, 180px) minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 16px;
   align-items: start;
-  padding: 12px 4px 16px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 14px 4px 18px;
+  border-bottom: 1px solid var(--layermark-line);
   position: relative;
 }
 
@@ -53,10 +60,13 @@
   min-width: 0;
   max-width: 220px;
   overflow: hidden;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
+  color: var(--layermark-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.25;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -68,16 +78,16 @@
   min-width: 0;
   overflow: visible;
   margin: 0;
-  padding: 6px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  background: var(--background-primary);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 5px;
+  border: 1px solid var(--layermark-line);
+  border-radius: 6px;
+  background: var(--layermark-surface);
+  box-shadow: none;
 }
 
 .skitch-layer-tool-group {
   display: flex;
-  gap: 1px;
+  gap: 2px;
   align-items: stretch;
   flex: 0 1 auto;
   flex-wrap: wrap;
@@ -89,15 +99,17 @@
   gap: 3px;
   align-items: center;
   justify-content: center;
-  min-width: 48px;
+  min-width: 50px;
   height: 46px;
   padding: 4px 5px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 4px;
   box-shadow: none;
-  color: var(--text-muted);
+  color: var(--layermark-muted);
   font-size: 11px;
+  font-weight: 600;
   line-height: 1;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .skitch-layer-tool-icon {
@@ -113,8 +125,8 @@
 }
 
 .skitch-layer-tool-group button.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  background: var(--layermark-accent);
+  color: #ffffff;
 }
 
 .skitch-layer-style-controls {
@@ -124,14 +136,14 @@
   flex: 1 1 360px;
   flex-wrap: wrap;
   padding-left: 8px;
-  border-left: 1px solid var(--background-modifier-border);
+  border-left: 1px solid var(--layermark-line);
 }
 
 .skitch-layer-color-input {
   width: 30px;
   height: 30px;
   padding: 2px;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--layermark-line);
   border-radius: 999px;
   background: transparent;
 }
@@ -147,9 +159,9 @@
   height: 16px;
   min-width: 16px;
   padding: 0;
-  border: 1px solid rgba(127, 127, 127, 0.45);
+  border: 1px solid rgba(17, 24, 39, 0.3);
   border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  box-shadow: none;
 }
 
 .skitch-layer-width-input {
@@ -172,13 +184,13 @@
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: 4px;
   font-weight: 800;
 }
 
 .skitch-layer-bold-button.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  background: var(--layermark-accent);
+  color: #ffffff;
 }
 
 
@@ -187,7 +199,7 @@
   gap: 4px;
   align-items: center;
   padding-left: 8px;
-  border-left: 1px solid var(--background-modifier-border);
+  border-left: 1px solid var(--layermark-line);
 }
 
 .skitch-layer-badge-number-controls.is-visible {
@@ -195,7 +207,7 @@
 }
 
 .skitch-layer-badge-number-label {
-  color: var(--text-muted);
+  color: var(--layermark-muted);
   font-size: 11px;
   font-weight: 600;
 }
@@ -212,7 +224,7 @@
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 700;
 }
@@ -235,11 +247,21 @@
 
 .skitch-layer-actions button {
   height: 32px;
+  border-radius: 4px;
+}
+
+.skitch-layer-actions button.mod-cta {
+  background: var(--layermark-ink);
+  color: #ffffff;
+}
+
+.skitch-layer-actions button.mod-cta:hover {
+  background: var(--layermark-accent-strong);
 }
 
 .skitch-layer-zoom-label {
   min-width: 44px;
-  color: var(--text-muted);
+  color: var(--layermark-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -250,9 +272,9 @@
   min-height: 360px;
   overflow: auto;
   margin-top: 14px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
+  background: var(--layermark-surface-subtle);
+  border: 1px solid var(--layermark-line);
+  border-radius: 6px;
   position: relative;
   user-select: none;
 }
@@ -303,8 +325,9 @@
   overflow: hidden;
   margin: 0 auto;
   background: var(--background-primary);
-  border-radius: 4px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 2px;
+  box-shadow: 0 18px 40px rgba(17, 24, 39, 0.1);
 }
 
 .skitch-layer-text-editor {
@@ -312,11 +335,11 @@
   z-index: 20;
   min-width: 140px;
   padding: 2px 4px;
-  border: 1.5px dashed currentColor;
-  border-radius: 4px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
   outline: none;
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.16);
   caret-color: currentColor;
   font-size: max(16px, 1em);
   line-height: 1.2;

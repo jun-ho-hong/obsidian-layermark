@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-skitch-layer",
-  "version": "0.1.0",
-  "description": "Non-destructive Skitch-style image annotations for Obsidian.",
+  "name": "obsidian-layermark",
+  "version": "0.2.0",
+  "description": "Non-destructive image markup layers for Obsidian.",
   "main": "main.js",
   "scripts": {
     "test": "vitest run",
@@ -13,7 +13,8 @@
     "obsidian",
     "obsidian-plugin",
     "image-annotation",
-    "skitch"
+    "image-markup",
+    "non-destructive"
   ],
   "author": "Jun Ho Hong",
   "license": "MIT",

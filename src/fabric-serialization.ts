@@ -29,7 +29,7 @@ export function serializeFabricScene(objects: FabricSerializableObject[]): Fabri
     try {
       serialized.push(object.toObject(SKITCH_FABRIC_PROPERTIES));
     } catch (error) {
-      console.warn("Skipping unserializable Skitch annotation object", error);
+      console.warn("Skipping unserializable LayerMark annotation object", error);
     }
   }
   return {

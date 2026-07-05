@@ -1,6 +1,13 @@
 import { normalizePath, TFile, type App } from "obsidian";
 import { type AnnotationDocument, type ImageSize } from "./annotation-model";
-import { getAnnotationSidecarPath, getPreviewImagePath, isSkitchSidecarPath } from "./preview-paths";
+import {
+  LEGACY_SKITCH_JSON_SUFFIX,
+  getAnnotationSidecarPath,
+  getAnnotationSidecarPaths,
+  getPreviewImagePath,
+  getPreviewImagePaths,
+  isSkitchSidecarPath
+} from "./preview-paths";
 
 export class AnnotationStorage {
   private annotationIndex: Map<string, AnnotationDocument> | null = null;
@@ -38,7 +45,10 @@ export class AnnotationStorage {
       return this.annotationIndex.get(imagePath) ?? null;
     }
 
-    const sidecarPath = this.getSidecarPath(imagePath);
+    const sidecarPath = this.getExistingSidecarPath(imagePath);
+    if (!sidecarPath) {
+      return null;
+    }
     const file = this.app.vault.getAbstractFileByPath(sidecarPath);
     if (!(file instanceof TFile)) {
       return null;
@@ -50,7 +60,7 @@ export class AnnotationStorage {
       this.annotationIndex?.set(document.imagePath, document);
       return document;
     } catch (error) {
-      console.warn(`Unable to read Skitch Layer annotation file: ${sidecarPath}`, error);
+      console.warn(`Unable to read LayerMark annotation file: ${sidecarPath}`, error);
       return null;
     }
   }
@@ -60,7 +70,9 @@ export class AnnotationStorage {
       return Array.from(this.annotationIndex.values());
     }
 
-    const annotationFiles = this.app.vault.getFiles().filter((file) => isSkitchSidecarPath(file.path));
+    const annotationFiles = this.app.vault.getFiles()
+      .filter((file) => isSkitchSidecarPath(file.path))
+      .sort((a, b) => Number(b.path.endsWith(LEGACY_SKITCH_JSON_SUFFIX)) - Number(a.path.endsWith(LEGACY_SKITCH_JSON_SUFFIX)));
     const annotations = new Map<string, AnnotationDocument>();
     for (const file of annotationFiles) {
       try {
@@ -68,7 +80,7 @@ export class AnnotationStorage {
         const document = JSON.parse(raw) as AnnotationDocument;
         annotations.set(document.imagePath, document);
       } catch (error) {
-        console.warn(`Unable to read Skitch Layer annotation file: ${file.path}`, error);
+        console.warn(`Unable to read LayerMark annotation file: ${file.path}`, error);
       }
     }
     this.annotationIndex = annotations;
@@ -94,8 +106,13 @@ export class AnnotationStorage {
 
 
   async handleImageRenamed(oldImagePath: string, newImagePath: string): Promise<void> {
-    const oldSidecarPath = this.getSidecarPath(oldImagePath);
+    const oldSidecarPath = this.getExistingSidecarPath(oldImagePath);
     const newSidecarPath = this.getSidecarPath(newImagePath);
+    if (!oldSidecarPath) {
+      await this.renamePreviewIfPresent(oldImagePath, newImagePath);
+      this.invalidateIndex();
+      return;
+    }
     const sidecar = this.app.vault.getAbstractFileByPath(oldSidecarPath);
     if (sidecar instanceof TFile) {
       if (oldSidecarPath !== newSidecarPath) {
@@ -108,7 +125,7 @@ export class AnnotationStorage {
           const document = JSON.parse(raw) as AnnotationDocument;
           await this.save({ ...document, imagePath: newImagePath });
         } catch (error) {
-          console.warn(`Unable to update Skitch Layer annotation path after rename: ${newSidecarPath}`, error);
+          console.warn(`Unable to update LayerMark annotation path after rename: ${newSidecarPath}`, error);
           this.invalidateIndex();
         }
       }
@@ -119,19 +136,25 @@ export class AnnotationStorage {
   }
 
   async handleImageDeleted(imagePath: string): Promise<void> {
-    await this.deleteIfPresent(this.getSidecarPath(imagePath));
-    await this.deleteIfPresent(this.getPreviewPath(imagePath));
+    for (const path of getAnnotationSidecarPaths(imagePath)) {
+      await this.deleteIfPresent(normalizePath(path));
+    }
+    for (const path of getPreviewImagePaths(imagePath)) {
+      await this.deleteIfPresent(normalizePath(path));
+    }
     this.invalidateIndex();
   }
 
   async deletePreview(imagePath: string): Promise<void> {
-    await this.deleteIfPresent(this.getPreviewPath(imagePath));
+    for (const path of getPreviewImagePaths(imagePath)) {
+      await this.deleteIfPresent(normalizePath(path));
+    }
   }
 
   private async renamePreviewIfPresent(oldImagePath: string, newImagePath: string): Promise<void> {
-    const oldPreviewPath = this.getPreviewPath(oldImagePath);
+    const oldPreviewPath = this.getExistingPreviewPath(oldImagePath);
     const newPreviewPath = this.getPreviewPath(newImagePath);
-    if (oldPreviewPath === newPreviewPath) {
+    if (!oldPreviewPath || oldPreviewPath === newPreviewPath) {
       return;
     }
     const preview = this.app.vault.getAbstractFileByPath(oldPreviewPath);
@@ -146,6 +169,27 @@ export class AnnotationStorage {
       await this.app.vault.delete(file);
     }
   }
+
+  private getExistingSidecarPath(imagePath: string): string | null {
+    for (const path of getAnnotationSidecarPaths(imagePath)) {
+      const normalized = normalizePath(path);
+      if (this.app.vault.getAbstractFileByPath(normalized) instanceof TFile) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  private getExistingPreviewPath(imagePath: string): string | null {
+    for (const path of getPreviewImagePaths(imagePath)) {
+      const normalized = normalizePath(path);
+      if (this.app.vault.getAbstractFileByPath(normalized) instanceof TFile) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
   async savePreview(imagePath: string, bytes: ArrayBuffer): Promise<string> {
     const previewPath = this.getPreviewPath(imagePath);
     const existing = this.app.vault.getAbstractFileByPath(previewPath);

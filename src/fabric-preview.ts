@@ -23,7 +23,7 @@ export async function createFabricPreviewPngBlob(document: AnnotationDocument, i
   baseCanvas.height = document.imageSize.height;
   const context = baseCanvas.getContext("2d");
   if (!context) {
-    throw new Error("Unable to create canvas context for Skitch preview.");
+    throw new Error("Unable to create canvas context for LayerMark preview.");
   }
 
   const sourceImage = await loadImage(imageSrc);
@@ -64,7 +64,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Unable to load source image for Skitch preview: ${src}`));
+    image.onerror = () => reject(new Error(`Unable to load source image for LayerMark preview: ${src}`));
     image.src = src;
   });
 }
@@ -75,7 +75,7 @@ function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
       if (blob) {
         resolve(blob);
       } else {
-        reject(new Error("Unable to export Skitch preview PNG."));
+        reject(new Error("Unable to export LayerMark preview PNG."));
       }
     }, "image/png");
   });

@@ -1,8 +1,8 @@
 import { PluginSettingTab, Setting, type App } from "obsidian";
-import type SkitchLayerPlugin from "./main";
+import type LayerMarkPlugin from "./main";
 import { DEFAULT_STYLE, normalizeFontSize, normalizeStrokeWidth } from "./editor-tools";
 
-export type SkitchLayerSettings = {
+export type LayerMarkSettings = {
   defaultColor: string;
   defaultStrokeWidth: number;
   defaultFontSize: number;
@@ -10,7 +10,7 @@ export type SkitchLayerSettings = {
   wheelZoomSensitivity: number;
 };
 
-export const DEFAULT_SETTINGS: SkitchLayerSettings = {
+export const DEFAULT_SETTINGS: LayerMarkSettings = {
   defaultColor: DEFAULT_STYLE.color,
   defaultStrokeWidth: DEFAULT_STYLE.strokeWidth,
   defaultFontSize: DEFAULT_STYLE.fontSize,
@@ -18,10 +18,10 @@ export const DEFAULT_SETTINGS: SkitchLayerSettings = {
   wheelZoomSensitivity: 1.12
 };
 
-export class SkitchLayerSettingTab extends PluginSettingTab {
+export class LayerMarkSettingTab extends PluginSettingTab {
   constructor(
     app: App,
-    private readonly plugin: SkitchLayerPlugin
+    private readonly plugin: LayerMarkPlugin
   ) {
     super(app, plugin);
   }

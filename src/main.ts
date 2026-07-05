@@ -11,24 +11,25 @@ import {
 } from "./long-press";
 import { putFabricJson } from "./fabric-adapter";
 import { createFabricPreviewPngBlob } from "./fabric-preview";
+import { isSkitchSidecarPath } from "./preview-paths";
 import { attachFabricOverlay, attachOverlay, hasFabricOverlay, type FabricOverlayHandle } from "./render-overlay";
-import { DEFAULT_SETTINGS, SkitchLayerSettingTab, type SkitchLayerSettings } from "./settings";
+import { DEFAULT_SETTINGS, LayerMarkSettingTab, type LayerMarkSettings } from "./settings";
 import { AnnotationStorage } from "./storage";
 
 const SUPPORTED_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]);
 
-export default class SkitchLayerPlugin extends Plugin {
+export default class LayerMarkPlugin extends Plugin {
   private storage!: AnnotationStorage;
   private refreshTimer: number | null = null;
   private runtimePreviewUrls = new Set<string>();
   private longPressTimer: number | null = null;
   private longPressStart: (LongPressPoint & { pointerId: number; target: HTMLElement }) | null = null;
-  settings: SkitchLayerSettings = { ...DEFAULT_SETTINGS };
+  settings: LayerMarkSettings = { ...DEFAULT_SETTINGS };
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.storage = new AnnotationStorage(this.app);
-    this.addSettingTab(new SkitchLayerSettingTab(this.app, this));
+    this.addSettingTab(new LayerMarkSettingTab(this.app, this));
 
     this.addCommand({
       id: "annotate-image-by-path",
@@ -38,20 +39,20 @@ export default class SkitchLayerPlugin extends Plugin {
 
     this.registerMarkdownPostProcessor((element, context) => {
       this.processImages(element, context).catch((error) => {
-        console.warn("Skitch Layer failed to process image annotations", error);
+        console.warn("LayerMark failed to process image annotations", error);
       });
     });
 
     this.registerDomEvent(document, "copy", (event: ClipboardEvent) => {
       this.copySelectedAnnotatedImage(event).catch((error) => {
-        console.warn("Skitch Layer failed to copy annotated image", error);
+        console.warn("LayerMark failed to copy annotated image", error);
         new Notice(error instanceof Error ? error.message : "Unable to copy annotated image");
       });
     });
 
     this.registerDomEvent(document, "contextmenu", (event: MouseEvent) => {
       this.openAnnotatedImageContextMenu(event).catch((error) => {
-        console.warn("Skitch Layer failed to open annotated image menu", error);
+        console.warn("LayerMark failed to open annotated image menu", error);
       });
     });
     this.registerDomEvent(document, "pointerdown", (event: PointerEvent) => this.beginAnnotatedImageLongPress(event));
@@ -87,13 +88,13 @@ export default class SkitchLayerPlugin extends Plugin {
 
     this.registerEvent(this.app.workspace.on("layout-change", () => this.scheduleRefreshVisibleAnnotations()));
     this.registerEvent(this.app.vault.on("create", (file) => {
-      if (file instanceof TFile && file.path.endsWith(".skitch.json")) {
+      if (file instanceof TFile && isSkitchSidecarPath(file.path)) {
         this.storage.invalidateIndex();
         this.scheduleRefreshVisibleAnnotations();
       }
     }));
     this.registerEvent(this.app.vault.on("modify", (file) => {
-      if (file instanceof TFile && file.path.endsWith(".skitch.json")) {
+      if (file instanceof TFile && isSkitchSidecarPath(file.path)) {
         this.storage.invalidateIndex();
         this.scheduleRefreshVisibleAnnotations();
       }
@@ -102,14 +103,14 @@ export default class SkitchLayerPlugin extends Plugin {
       if (!(file instanceof TFile)) {
         return;
       }
-      if (file.path.endsWith(".skitch.json")) {
+      if (isSkitchSidecarPath(file.path)) {
         this.storage.invalidateIndex();
         this.scheduleRefreshVisibleAnnotations();
         return;
       }
       if (this.isSupportedImage(file)) {
         this.storage.handleImageDeleted(file.path).catch((error) => {
-          console.warn("Skitch Layer failed to clean up deleted image annotations", error);
+          console.warn("LayerMark failed to clean up deleted image annotations", error);
         });
       }
     }));
@@ -117,7 +118,7 @@ export default class SkitchLayerPlugin extends Plugin {
       if (!(file instanceof TFile)) {
         return;
       }
-      if (file.path.endsWith(".skitch.json") || oldPath.endsWith(".skitch.json")) {
+      if (isSkitchSidecarPath(file.path) || isSkitchSidecarPath(oldPath)) {
         this.storage.invalidateIndex();
         this.scheduleRefreshVisibleAnnotations();
         return;
@@ -126,7 +127,7 @@ export default class SkitchLayerPlugin extends Plugin {
         this.storage.handleImageRenamed(oldPath, file.path).then(() => {
           this.scheduleRefreshVisibleAnnotations();
         }).catch((error) => {
-          console.warn("Skitch Layer failed to rename image annotations", error);
+          console.warn("LayerMark failed to rename image annotations", error);
         });
       }
     }));
@@ -221,7 +222,7 @@ export default class SkitchLayerPlugin extends Plugin {
     this.refreshTimer = window.setTimeout(() => {
       this.refreshTimer = null;
       this.refreshAllVisibleAnnotations().catch((error) => {
-        console.warn("Skitch Layer failed to refresh annotations", error);
+        console.warn("LayerMark failed to refresh annotations", error);
       });
     }, 150);
   }
@@ -306,7 +307,7 @@ export default class SkitchLayerPlugin extends Plugin {
         image.dataset.skitchRuntimePreviewUrl = url;
         image.src = url;
       } catch (error) {
-        console.warn("Skitch Layer failed to render runtime annotated image", error);
+        console.warn("LayerMark failed to render runtime annotated image", error);
         image.src = originalSrc;
         const overlayHandle = await attachFabricOverlay(wrapper, annotation);
         this.registerFabricOverlayLifecycle(context, overlayHandle);
@@ -403,7 +404,7 @@ export default class SkitchLayerPlugin extends Plugin {
         x: start.x,
         y: start.y
       }).catch((error) => {
-        console.warn("Skitch Layer failed to open long-press image menu", error);
+        console.warn("LayerMark failed to open long-press image menu", error);
       });
     }, LONG_PRESS_DELAY_MS);
   }
@@ -480,7 +481,7 @@ export default class SkitchLayerPlugin extends Plugin {
           try {
             await this.copyAnnotatedImageWithFallback(image, annotation);
           } catch (error) {
-            console.warn("Skitch Layer failed to copy annotated image", error);
+            console.warn("LayerMark failed to copy annotated image", error);
             new Notice(error instanceof Error ? error.message : "Unable to copy annotated image");
           }
         });
@@ -553,7 +554,7 @@ export default class SkitchLayerPlugin extends Plugin {
     } catch (error) {
       const blob = await createAnnotatedImageBlob(image, annotation);
       const previewPath = await this.storage.savePreview(annotation.imagePath, await blob.arrayBuffer());
-      console.warn("Skitch Layer clipboard copy unavailable; saved preview instead", error);
+      console.warn("LayerMark clipboard copy unavailable; saved preview instead", error);
       new Notice(`Clipboard unavailable. Preview saved to ${previewPath}`);
     }
   }
@@ -671,7 +672,7 @@ class SkitchFabricOverlayRenderChild extends MarkdownRenderChild {
 
   onunload(): void {
     this.overlayHandle.dispose().catch((error) => {
-      console.warn("Skitch Layer failed to dispose Fabric overlay", error);
+      console.warn("LayerMark failed to dispose Fabric overlay", error);
     });
   }
 }
