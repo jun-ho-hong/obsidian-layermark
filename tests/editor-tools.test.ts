@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TEXT_FONT_FAMILY,
+  DEFAULT_STYLE,
+  MARKUP_COLOR_PRESETS,
+  TEXT_SIZE_PRESETS,
   createArrowPathData,
   isContinuousTool,
   nextBadgeNumber,
@@ -13,6 +16,30 @@ import {
 } from "../src/editor-tools";
 
 describe("editor tools", () => {
+  it("uses LayerMark brand colors instead of the old hot-pink annotation default", () => {
+    expect(DEFAULT_STYLE.color).toBe("#ea580c");
+    expect(MARKUP_COLOR_PRESETS.map((preset) => preset.value)).toEqual([
+      "#111827",
+      "#0d9488",
+      "#2563eb",
+      "#ea580c",
+      "#dc2626",
+      "#ffffff",
+      "#64748b"
+    ]);
+    expect(MARKUP_COLOR_PRESETS.map((preset) => preset.value)).not.toContain("#ff2b7a");
+    expect(MARKUP_COLOR_PRESETS.map((preset) => preset.value)).not.toContain("#8b5cf6");
+  });
+
+  it("offers readable text size presets for the toolbar", () => {
+    expect(TEXT_SIZE_PRESETS).toEqual([
+      { label: "S", value: 32 },
+      { label: "M", value: 48 },
+      { label: "L", value: 64 },
+      { label: "XL", value: 96 }
+    ]);
+  });
+
   it("maps keyboard shortcuts to tools", () => {
     expect(toolFromShortcut("1")).toBe("select");
     expect(toolFromShortcut("2")).toBe("pen");
@@ -48,7 +75,7 @@ describe("editor tools", () => {
     expect(normalizeStrokeWidth(99)).toBe(32);
     expect(normalizeFontSize(2)).toBe(12);
     expect(normalizeFontSize(999)).toBe(220);
-    expect(normalizeNewTextFontSize(8)).toBe(56);
+    expect(normalizeNewTextFontSize(8)).toBe(32);
     expect(normalizeNewTextFontSize(72)).toBe(72);
   });
 

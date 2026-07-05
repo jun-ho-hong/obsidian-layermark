@@ -7,12 +7,29 @@ export type AnnotationStyleState = {
 };
 
 export const DEFAULT_STYLE: AnnotationStyleState = {
-  color: "#ff2b7a",
-  strokeWidth: 8,
-  fontSize: 32
+  color: "#ea580c",
+  strokeWidth: 6,
+  fontSize: 48
 };
 
 export const DEFAULT_TEXT_FONT_FAMILY = "Arial, Helvetica, sans-serif";
+
+export const MARKUP_COLOR_PRESETS = [
+  { label: "Ink", value: "#111827" },
+  { label: "Teal", value: "#0d9488" },
+  { label: "Blue", value: "#2563eb" },
+  { label: "Amber", value: "#ea580c" },
+  { label: "Red", value: "#dc2626" },
+  { label: "White", value: "#ffffff" },
+  { label: "Slate", value: "#64748b" }
+] as const;
+
+export const TEXT_SIZE_PRESETS = [
+  { label: "S", value: 32 },
+  { label: "M", value: 48 },
+  { label: "L", value: 64 },
+  { label: "XL", value: 96 }
+] as const;
 
 const TOOL_SHORTCUTS: Record<string, EditorTool> = {
   "1": "select",
@@ -46,7 +63,7 @@ export function normalizeFontSize(value: number): number {
 }
 
 export function normalizeNewTextFontSize(value: number): number {
-  return Math.max(56, normalizeFontSize(value));
+  return Math.max(32, normalizeFontSize(value));
 }
 
 export function normalizeTextFontFamily(value: string): string {

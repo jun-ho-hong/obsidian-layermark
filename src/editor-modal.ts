@@ -14,6 +14,8 @@ import { createFabricPreviewPngBlob, stripSkitchBackgroundObjects } from "./fabr
 import {
   DEFAULT_TEXT_FONT_FAMILY,
   DEFAULT_STYLE,
+  MARKUP_COLOR_PRESETS,
+  TEXT_SIZE_PRESETS,
   createArrowPathData,
   isContinuousTool,
   nextBadgeNumber,
@@ -37,8 +39,6 @@ import {
   type TouchGesturePoint,
   type TouchViewportStart
 } from "./touch-gesture";
-
-const COLOR_PRESETS = ["#ff2b7a", "#ff8a1f", "#ffd400", "#22c55e", "#38bdf8", "#8b5cf6", "#ffffff", "#111827"];
 
 export class AnnotationEditorModal extends Modal {
   private document: AnnotationDocument | null = null;
@@ -208,12 +208,14 @@ export class AnnotationEditorModal extends Modal {
     this.colorInputEl = color;
 
     const presets = container.createDiv({ cls: "skitch-layer-color-presets" });
-    for (const preset of COLOR_PRESETS) {
+    for (const preset of MARKUP_COLOR_PRESETS) {
       const swatch = presets.createEl("button", { cls: "skitch-layer-color-swatch" });
       swatch.type = "button";
-      swatch.title = preset;
-      swatch.style.backgroundColor = preset;
-      swatch.addEventListener("click", () => this.setStyleColor(preset));
+      swatch.title = preset.label;
+      swatch.ariaLabel = preset.label;
+      swatch.dataset.color = preset.value;
+      swatch.style.backgroundColor = preset.value;
+      swatch.addEventListener("click", () => this.setStyleColor(preset.value));
     }
 
     const stroke = container.createEl("input", { cls: "skitch-layer-width-input" });
@@ -241,9 +243,31 @@ export class AnnotationEditorModal extends Modal {
     fontSize.addEventListener("change", () => {
       this.style.fontSize = normalizeFontSize(Number(fontSize.value));
       fontSize.value = String(this.style.fontSize);
+      this.syncTextSizePresetState();
       this.applyStyleToSelection();
     });
     this.fontSizeInputEl = fontSize;
+
+    const textSizePresets = container.createDiv({ cls: "skitch-layer-text-size-presets" });
+    for (const preset of TEXT_SIZE_PRESETS) {
+      const button = textSizePresets.createEl("button", { cls: "skitch-layer-text-size-button", text: preset.label });
+      button.type = "button";
+      button.title = `Text ${preset.value}px`;
+      button.dataset.fontSize = String(preset.value);
+      button.addEventListener("click", () => {
+        this.style.fontSize = preset.value;
+        if (this.fontSizeInputEl) {
+          this.fontSizeInputEl.value = String(this.style.fontSize);
+        }
+        this.syncTextSizePresetState();
+        this.applyStyleToSelection();
+        if (this.textEditorEl && this.textEditorPoint) {
+          this.applyTextEditorStyle(this.textEditorEl, this.textEditorPoint);
+          this.resizeTextEditor(this.textEditorEl);
+        }
+      });
+    }
+    this.syncTextSizePresetState();
 
     const fontFamily = container.createEl("select", { cls: "skitch-layer-font-family-input" });
     fontFamily.title = "Text font";
@@ -334,6 +358,12 @@ export class AnnotationEditorModal extends Modal {
       this.applyTextEditorStyle(this.textEditorEl, this.textEditorPoint);
     }
     this.configureTool();
+  }
+
+  private syncTextSizePresetState(): void {
+    this.contentEl.querySelectorAll<HTMLElement>(".skitch-layer-text-size-button").forEach((button) => {
+      button.toggleClass("is-active", Number(button.dataset.fontSize) === this.style.fontSize);
+    });
   }
 
   private async measureImage(): Promise<ImageSize> {
@@ -750,6 +780,7 @@ export class AnnotationEditorModal extends Modal {
       if (this.fontSizeInputEl) {
         this.fontSizeInputEl.value = String(this.style.fontSize);
       }
+      this.syncTextSizePresetState();
     }
     const fontFamily = normalizeTextFontFamily(String(object.get("fontFamily") || ""));
     if (fontFamily && this.fontFamilySelectEl && Array.from(this.fontFamilySelectEl.options).some((option) => option.value === fontFamily)) {
@@ -1126,8 +1157,8 @@ function applySelectionControls(object: FabricObject): void {
     touchCornerSize: 28,
     transparentCorners: false,
     cornerColor: "#ffffff",
-    cornerStrokeColor: "#8b5cf6",
-    borderColor: "#8b5cf6",
+    cornerStrokeColor: "#0d9488",
+    borderColor: "#0d9488",
     borderScaleFactor: 2,
     padding: 4
   } as Partial<FabricObject>);

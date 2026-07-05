@@ -1,6 +1,6 @@
 {
   "name": "obsidian-layermark",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Non-destructive image markup layers for Obsidian.",
   "main": "main.js",
   "scripts": {
