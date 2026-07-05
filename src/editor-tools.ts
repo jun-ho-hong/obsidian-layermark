@@ -1,4 +1,4 @@
-export type EditorTool = "select" | "pen" | "text" | "highlight" | "rectangle" | "ellipse" | "arrow" | "badge";
+export type EditorTool = "select" | "pen" | "text" | "highlight" | "rectangle" | "ellipse" | "arrow" | "stamp";
 
 export type AnnotationStyleState = {
   color: string;
@@ -39,19 +39,19 @@ const TOOL_SHORTCUTS: Record<string, EditorTool> = {
   "5": "rectangle",
   "6": "ellipse",
   "7": "arrow",
-  "8": "badge"
+  "8": "stamp"
 };
 
 export function toolFromShortcut(key: string): EditorTool | null {
   return TOOL_SHORTCUTS[key.toLowerCase()] ?? null;
 }
 
-export function normalizeBadgeNumber(value: number): number {
+export function normalizeStampNumber(value: number): number {
   return Math.max(1, Math.floor(Number.isFinite(value) ? value : 1));
 }
 
-export function nextBadgeNumber(current: number): number {
-  return normalizeBadgeNumber(current) + 1;
+export function nextStampNumber(current: number): number {
+  return normalizeStampNumber(current) + 1;
 }
 
 export function normalizeStrokeWidth(value: number): number {
@@ -75,7 +75,7 @@ export function normalizeTextFontFamily(value: string): string {
 }
 
 export function isContinuousTool(tool: EditorTool): boolean {
-  return tool === "badge";
+  return tool === "stamp";
 }
 
 export type ArrowPathPoint = {

@@ -254,7 +254,7 @@
 }
 
 
-.layermark-badge-number-controls {
+.layermark-stamp-number-controls {
   display: none;
   gap: 4px;
   align-items: center;
@@ -262,25 +262,25 @@
   border-left: 1px solid var(--layermark-line);
 }
 
-.layermark-badge-number-controls.is-visible {
+.layermark-stamp-number-controls.is-visible {
   display: flex;
 }
 
-.layermark-badge-number-label {
+.layermark-stamp-number-label {
   color: var(--layermark-muted);
   font-size: 11px;
   font-weight: 600;
 }
 
-.layermark-badge-number-input {
+.layermark-stamp-number-input {
   width: 54px;
   height: 30px;
   font-size: 12px;
   text-align: center;
 }
 
-.layermark-badge-number-button,
-.layermark-badge-number-reset {
+.layermark-stamp-number-button,
+.layermark-stamp-number-reset {
   width: 30px;
   height: 30px;
   padding: 0;
@@ -463,19 +463,19 @@
   .layermark-style-controls,
   .layermark-style-section,
   .layermark-color-presets,
-  .layermark-badge-number-controls.is-visible {
+  .layermark-stamp-number-controls.is-visible {
     flex-wrap: nowrap;
   }
 
   .layermark-style-controls,
-  .layermark-badge-number-controls {
+  .layermark-stamp-number-controls {
     flex: 0 0 auto;
   }
 
   .layermark-tool-group button,
   .layermark-actions button,
-  .layermark-badge-number-button,
-  .layermark-badge-number-reset,
+  .layermark-stamp-number-button,
+  .layermark-stamp-number-reset,
   .layermark-bold-button {
     min-width: 44px;
     min-height: 44px;

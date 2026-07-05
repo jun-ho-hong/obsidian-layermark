@@ -6,8 +6,8 @@ import {
   TEXT_SIZE_PRESETS,
   createArrowPathData,
   isContinuousTool,
-  nextBadgeNumber,
-  normalizeBadgeNumber,
+  nextStampNumber,
+  normalizeStampNumber,
   normalizeFontSize,
   normalizeNewTextFontSize,
   normalizeStrokeWidth,
@@ -48,7 +48,7 @@ describe("editor tools", () => {
     expect(toolFromShortcut("5")).toBe("rectangle");
     expect(toolFromShortcut("6")).toBe("ellipse");
     expect(toolFromShortcut("7")).toBe("arrow");
-    expect(toolFromShortcut("8")).toBe("badge");
+    expect(toolFromShortcut("8")).toBe("stamp");
     expect(toolFromShortcut("v")).toBeNull();
     expect(toolFromShortcut("P")).toBeNull();
     expect(toolFromShortcut("t")).toBeNull();
@@ -59,16 +59,16 @@ describe("editor tools", () => {
     expect(toolFromShortcut("b")).toBeNull();
   });
 
-  it("increments badge numbers from at least one", () => {
-    expect(nextBadgeNumber(1)).toBe(2);
-    expect(nextBadgeNumber(0)).toBe(2);
+  it("increments stamp numbers from at least one", () => {
+    expect(nextStampNumber(1)).toBe(2);
+    expect(nextStampNumber(0)).toBe(2);
   });
 
-  it("normalizes user-selected badge numbers", () => {
-    expect(normalizeBadgeNumber(9)).toBe(9);
-    expect(normalizeBadgeNumber(1.8)).toBe(1);
-    expect(normalizeBadgeNumber(0)).toBe(1);
-    expect(normalizeBadgeNumber(Number.NaN)).toBe(1);
+  it("normalizes user-selected stamp numbers", () => {
+    expect(normalizeStampNumber(9)).toBe(9);
+    expect(normalizeStampNumber(1.8)).toBe(1);
+    expect(normalizeStampNumber(0)).toBe(1);
+    expect(normalizeStampNumber(Number.NaN)).toBe(1);
   });
   it("normalizes editable style values", () => {
     expect(normalizeStrokeWidth(0)).toBe(1);
@@ -85,8 +85,8 @@ describe("editor tools", () => {
     expect(normalizeTextFontFamily("Arial, Helvetica, sans-serif")).toBe("Arial, Helvetica, sans-serif");
   });
 
-  it("keeps badge active as a continuous stamping tool", () => {
-    expect(isContinuousTool("badge")).toBe(true);
+  it("keeps stamp active as a continuous stamping tool", () => {
+    expect(isContinuousTool("stamp")).toBe(true);
     expect(isContinuousTool("text")).toBe(false);
     expect(isContinuousTool("arrow")).toBe(false);
   });

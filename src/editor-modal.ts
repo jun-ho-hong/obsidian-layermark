@@ -1,4 +1,4 @@
-import { Canvas, Ellipse, FabricImage, Path, PencilBrush, Polyline, Rect, Textbox, type FabricObject } from "fabric";
+import { Canvas, Control, Ellipse, FabricImage, Path, PencilBrush, Point as FabricPoint, Polyline, Rect, Textbox, util, type FabricObject } from "fabric";
 import { Modal, Notice, setIcon, Setting, TFile, type App } from "obsidian";
 import {
   denormalizePoint,
@@ -18,8 +18,8 @@ import {
   TEXT_SIZE_PRESETS,
   createArrowPathData,
   isContinuousTool,
-  nextBadgeNumber,
-  normalizeBadgeNumber,
+  nextStampNumber,
+  normalizeStampNumber,
   normalizeFontSize,
   normalizeNewTextFontSize,
   normalizeStrokeWidth,
@@ -54,8 +54,8 @@ export class AnnotationEditorModal extends Modal {
   private fontSizeInputEl: HTMLInputElement | null = null;
   private fontFamilySelectEl: HTMLSelectElement | null = null;
   private boldButtonEl: HTMLButtonElement | null = null;
-  private badgeNumberControlEl: HTMLElement | null = null;
-  private badgeNumberInputEl: HTMLInputElement | null = null;
+  private stampNumberControlEl: HTMLElement | null = null;
+  private stampNumberInputEl: HTMLInputElement | null = null;
   private textEditorEl: HTMLTextAreaElement | null = null;
   private textEditorPoint: Point | null = null;
   private textEditorObject: Textbox | null = null;
@@ -66,6 +66,7 @@ export class AnnotationEditorModal extends Modal {
   private style: AnnotationStyleState;
   private textFontFamily = DEFAULT_TEXT_FONT_FAMILY;
   private textBold = true;
+  private lastStampSize: number | null = null;
   private isPanning = false;
   private panStart: { x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
   private activeTouchPointers = new Map<number, TouchGesturePoint>();
@@ -104,9 +105,9 @@ export class AnnotationEditorModal extends Modal {
     this.addToolButton(this.toolGroupEl, "rectangle", "\uc0ac\uac01\ud615", "square", "5");
     this.addToolButton(this.toolGroupEl, "ellipse", "\uc6d0", "circle", "6");
     this.addToolButton(this.toolGroupEl, "arrow", "\ud654\uc0b4\ud45c", "arrow-up-right", "7");
-    this.addToolButton(this.toolGroupEl, "badge", "\ubc30\uc9c0", "badge-check", "8");
+    this.addToolButton(this.toolGroupEl, "stamp", "Stamp", "stamp", "8");
     this.addStyleControls(palette.createDiv({ cls: "layermark-style-controls" }));
-    this.addBadgeNumberControls(palette.createDiv({ cls: "layermark-badge-number-controls" }));
+    this.addStampNumberControls(palette.createDiv({ cls: "layermark-stamp-number-controls" }));
     const actions = new Setting(toolbar.createDiv({ cls: "layermark-actions" }));
     actions.addButton((button) => {
       button.setButtonText("Delete").onClick(() => this.deleteSelection());
@@ -170,8 +171,8 @@ export class AnnotationEditorModal extends Modal {
     this.fontSizeInputEl = null;
     this.fontFamilySelectEl = null;
     this.boldButtonEl = null;
-    this.badgeNumberControlEl = null;
-    this.badgeNumberInputEl = null;
+    this.stampNumberControlEl = null;
+    this.stampNumberInputEl = null;
     this.textEditorEl?.remove();
     this.textEditorEl = null;
     this.textEditorPoint = null;
@@ -303,53 +304,53 @@ export class AnnotationEditorModal extends Modal {
     this.boldButtonEl = bold;
   }
 
-  private addBadgeNumberControls(container: HTMLElement): void {
-    this.badgeNumberControlEl = container;
-    container.createSpan({ cls: "layermark-badge-number-label", text: "\ubc30\uc9c0" });
+  private addStampNumberControls(container: HTMLElement): void {
+    this.stampNumberControlEl = container;
+    container.createSpan({ cls: "layermark-stamp-number-label", text: "Stamp" });
 
-    const decrease = container.createEl("button", { cls: "layermark-badge-number-button", text: "-" });
+    const decrease = container.createEl("button", { cls: "layermark-stamp-number-button", text: "-" });
     decrease.type = "button";
-    decrease.title = "Previous badge number";
-    decrease.addEventListener("click", () => this.setNextBadgeNumber(this.settings.nextBadgeNumber - 1));
+    decrease.title = "Previous stamp number";
+    decrease.addEventListener("click", () => this.setNextStampNumber(this.settings.nextStampNumber - 1));
 
-    const input = container.createEl("input", { cls: "layermark-badge-number-input" });
+    const input = container.createEl("input", { cls: "layermark-stamp-number-input" });
     input.type = "number";
     input.min = "1";
     input.step = "1";
-    input.title = "Next badge number";
-    input.addEventListener("change", () => this.setNextBadgeNumber(Number(input.value)));
-    this.badgeNumberInputEl = input;
+    input.title = "Next stamp number";
+    input.addEventListener("change", () => this.setNextStampNumber(Number(input.value)));
+    this.stampNumberInputEl = input;
 
-    const increase = container.createEl("button", { cls: "layermark-badge-number-button", text: "+" });
+    const increase = container.createEl("button", { cls: "layermark-stamp-number-button", text: "+" });
     increase.type = "button";
-    increase.title = "Next badge number";
-    increase.addEventListener("click", () => this.setNextBadgeNumber(this.settings.nextBadgeNumber + 1));
+    increase.title = "Next stamp number";
+    increase.addEventListener("click", () => this.setNextStampNumber(this.settings.nextStampNumber + 1));
 
-    const restart = container.createEl("button", { cls: "layermark-badge-number-reset", text: "1" });
+    const restart = container.createEl("button", { cls: "layermark-stamp-number-reset", text: "1" });
     restart.type = "button";
-    restart.title = "Restart badges at 1";
-    restart.addEventListener("click", () => this.setNextBadgeNumber(1));
+    restart.title = "Restart stamps at 1";
+    restart.addEventListener("click", () => this.setNextStampNumber(1));
 
-    this.syncBadgeNumberControl();
+    this.syncStampNumberControl();
   }
 
-  private setNextBadgeNumber(value: number): void {
-    this.settings.nextBadgeNumber = normalizeBadgeNumber(value);
-    this.syncBadgeNumberControl();
+  private setNextStampNumber(value: number): void {
+    this.settings.nextStampNumber = normalizeStampNumber(value);
+    this.syncStampNumberControl();
   }
 
-  private syncBadgeNumberControl(): void {
-    if (this.badgeNumberInputEl) {
-      this.badgeNumberInputEl.value = String(normalizeBadgeNumber(this.settings.nextBadgeNumber));
+  private syncStampNumberControl(): void {
+    if (this.stampNumberInputEl) {
+      this.stampNumberInputEl.value = String(normalizeStampNumber(this.settings.nextStampNumber));
     }
-    this.badgeNumberControlEl?.toggleClass("is-visible", this.tool === "badge");
+    this.stampNumberControlEl?.toggleClass("is-visible", this.tool === "stamp");
   }
   private setTool(tool: EditorTool): void {
     this.tool = tool;
     this.toolGroupEl?.querySelectorAll("button").forEach((candidate) => {
       candidate.toggleClass("is-active", candidate.dataset.tool === tool);
     });
-    this.syncBadgeNumberControl();
+    this.syncStampNumberControl();
     this.configureTool();
   }
 
@@ -477,8 +478,15 @@ export class AnnotationEditorModal extends Modal {
     if (!this.canvas) {
       return;
     }
-    this.canvas.on("selection:created", () => this.syncStyleFromSelection());
-    this.canvas.on("selection:updated", () => this.syncStyleFromSelection());
+    this.canvas.on("selection:created", () => {
+      this.syncStyleFromSelection();
+      this.syncLastStampSizeFromSelection();
+    });
+    this.canvas.on("selection:updated", () => {
+      this.syncStyleFromSelection();
+      this.syncLastStampSizeFromSelection();
+    });
+    this.canvas.on("object:modified", () => this.syncLastStampSizeFromSelection());
     this.canvas.on("path:created", (event) => {
       const path = event.path;
       if (!path) {
@@ -510,8 +518,8 @@ export class AnnotationEditorModal extends Modal {
       if (this.tool === "text") {
         this.addTextAt(pointer);
         this.drawingStart = null;
-      } else if (this.tool === "badge") {
-        this.addBadgeAt(pointer);
+      } else if (this.tool === "stamp") {
+        this.addStampAt(pointer);
         this.drawingStart = null;
       }
     });
@@ -799,6 +807,19 @@ export class AnnotationEditorModal extends Modal {
     }
   }
 
+  private syncLastStampSizeFromSelection(): void {
+    const object = this.canvas?.getActiveObject();
+    if (!object || object.get("skitchKind") !== "stamp") {
+      return;
+    }
+    const size = Math.max(object.getScaledWidth(), object.getScaledHeight());
+    if (!Number.isFinite(size) || size <= 0) {
+      return;
+    }
+    this.lastStampSize = Math.round(size);
+    object.set({ skitchStampSize: this.lastStampSize } as Partial<FabricObject>);
+  }
+
   private applyStyleToSelection(): void {
     const objects = this.canvas?.getActiveObjects() ?? [];
     for (const object of objects) {
@@ -935,20 +956,20 @@ export class AnnotationEditorModal extends Modal {
     this.canvas?.requestRenderAll();
   }
 
-  private addBadgeAt(point: Point): void {
+  private addStampAt(point: Point): void {
     if (!this.canvas) {
       return;
     }
-    const size = Math.max(64, Math.min(132, this.style.fontSize * 1.55));
-    const number = this.settings.nextBadgeNumber;
-    const badgeId = `badge-${Date.now()}-${number}`;
-    const source = createBadgeSvgDataUrl(String(number), this.style.color);
+    const size = this.lastStampSize ?? Math.max(64, Math.min(132, this.style.fontSize * 1.55));
+    const number = this.settings.nextStampNumber;
+    const stampId = `stamp-${Date.now()}-${number}`;
+    const source = createStampSvgDataUrl(String(number), this.style.color);
     const image = new Image();
     image.onload = () => {
       if (!this.canvas) {
         return;
       }
-      const badge = new FabricImage(image, {
+      const stamp = new FabricImage(image, {
         left: point.x,
         top: point.y,
         originX: "center",
@@ -957,17 +978,18 @@ export class AnnotationEditorModal extends Modal {
         scaleY: size / 160,
         selectable: true,
         evented: true,
-        skitchKind: "badge",
-        skitchBadgeId: badgeId
+        skitchKind: "stamp",
+        skitchStampId: stampId,
+        skitchStampSize: size
       } as Partial<FabricImage>);
-      applySelectionControls(badge);
-      this.canvas.add(badge);
-      this.canvas.setActiveObject(badge);
+      applySelectionControls(stamp);
+      this.canvas.add(stamp);
+      this.canvas.setActiveObject(stamp);
       this.canvas.requestRenderAll();
     };
     image.src = source;
-    this.settings.nextBadgeNumber = nextBadgeNumber(number);
-    this.syncBadgeNumberControl();
+    this.settings.nextStampNumber = nextStampNumber(number);
+    this.syncStampNumberControl();
     if (!isContinuousTool(this.tool)) {
       this.setTool("select");
     }
@@ -1140,15 +1162,20 @@ export class AnnotationEditorModal extends Modal {
 }
 
 function createArrow(start: Point, end: Point, color: string, strokeWidth: number): FabricObject {
-  return withControls(new Path(createArrowPathData(start, end, strokeWidth), {
+  const arrow = new Path(createArrowPathData(start, end, strokeWidth), {
     fill: "",
     stroke: color,
     strokeWidth,
     strokeLineCap: "round",
     strokeLineJoin: "round",
     selectable: true,
-    evented: true
-  }));
+    evented: true,
+    skitchKind: "arrow",
+    skitchArrowStart: start,
+    skitchArrowEnd: end
+  } as Partial<Path>);
+  applyArrowEndpointControls(arrow);
+  return arrow;
 }
 
 function withControls<T extends FabricObject>(object: T): T {
@@ -1157,6 +1184,10 @@ function withControls<T extends FabricObject>(object: T): T {
 }
 
 function applySelectionControls(object: FabricObject): void {
+  if (object.get("skitchKind") === "arrow" && object instanceof Path) {
+    applyArrowEndpointControls(object);
+    return;
+  }
   object.set({
     cornerSize: 16,
     touchCornerSize: 28,
@@ -1167,6 +1198,93 @@ function applySelectionControls(object: FabricObject): void {
     borderScaleFactor: 2,
     padding: 4
   } as Partial<FabricObject>);
+}
+
+function applyArrowEndpointControls(arrow: Path): void {
+  arrow.set({
+    cornerSize: 18,
+    touchCornerSize: 32,
+    transparentCorners: false,
+    cornerColor: "#ffffff",
+    cornerStrokeColor: "#0d9488",
+    borderColor: "rgba(13, 148, 136, 0.35)",
+    borderScaleFactor: 1,
+    padding: 6,
+    lockScalingX: true,
+    lockScalingY: true,
+    lockRotation: true
+  } as Partial<Path>);
+  arrow.controls = {
+    start: createArrowEndpointControl("start"),
+    end: createArrowEndpointControl("end")
+  };
+}
+
+function createArrowEndpointControl(endpoint: "start" | "end"): Control {
+  return new Control({
+    actionName: "modifyPath",
+    cursorStyle: "crosshair",
+    sizeX: 18,
+    sizeY: 18,
+    touchSizeX: 34,
+    touchSizeY: 34,
+    positionHandler: (_dim, _matrix, target) => {
+      const point = getArrowEndpoint(target as unknown as FabricObject, endpoint);
+      return new FabricPoint(point.x, point.y).transform(target.getViewportTransform());
+    },
+    actionHandler: (_event, transform, x, y) => {
+      const target = transform.target;
+      if (!(target instanceof Path)) {
+        return false;
+      }
+      const point = new FabricPoint(x, y).transform(util.invertTransform(target.getViewportTransform()));
+      setArrowEndpoint(target, endpoint, { x: point.x, y: point.y });
+      return true;
+    }
+  });
+}
+
+function getArrowEndpoint(object: FabricObject, endpoint: "start" | "end"): Point {
+  const value = object.get(endpoint === "start" ? "skitchArrowStart" : "skitchArrowEnd");
+  if (isPointLike(value)) {
+    return value;
+  }
+  if (object instanceof Path) {
+    const command = object.path[endpoint === "start" ? 0 : 1];
+    const x = Number(command?.[1]);
+    const y = Number(command?.[2]);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      return { x, y };
+    }
+  }
+  return { x: Number(object.left) || 0, y: Number(object.top) || 0 };
+}
+
+function setArrowEndpoint(arrow: Path, endpoint: "start" | "end", point: Point): void {
+  const start = endpoint === "start" ? point : getArrowEndpoint(arrow, "start");
+  const end = endpoint === "end" ? point : getArrowEndpoint(arrow, "end");
+  const next = new Path(createArrowPathData(start, end, Number(arrow.get("strokeWidth")) || DEFAULT_STYLE.strokeWidth));
+  arrow.set({
+    path: next.path,
+    left: next.left,
+    top: next.top,
+    width: next.width,
+    height: next.height,
+    pathOffset: next.pathOffset,
+    skitchArrowStart: start,
+    skitchArrowEnd: end,
+    dirty: true
+  } as Partial<Path>);
+  arrow.setDimensions();
+  arrow.setCoords();
+}
+
+function isPointLike(value: unknown): value is Point {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<Point>;
+  return Number.isFinite(candidate.x) && Number.isFinite(candidate.y);
 }
 
 function applyStyleToObject(object: FabricObject, style: AnnotationStyleState, textFontFamily: string, textBold: boolean): void {
@@ -1247,7 +1365,7 @@ function refreshTextObjectLayout(text: Textbox): void {
   text.dirty = true;
 }
 
-function createBadgeSvgDataUrl(label: string, color: string): string {
+function createStampSvgDataUrl(label: string, color: string): string {
   const safeColor = escapeSvgAttribute(color);
   const safeLabel = escapeSvgText(label);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
@@ -1284,8 +1402,8 @@ function toolLabel(tool: EditorTool): string {
       return "\uc6d0";
     case "arrow":
       return "\ud654\uc0b4\ud45c";
-    case "badge":
-      return "\ubc30\uc9c0";
+    case "stamp":
+      return "Stamp";
   }
 }
 

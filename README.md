@@ -9,7 +9,7 @@ It keeps the original image file unchanged, stores editable annotation data in a
 - Non-destructive annotations for normal Obsidian image embeds.
 - Editable sidecar data stored next to the source image as `<image>.layermark.json`.
 - Generated preview image stored as `<image>.layermark.png` for copy/export workflows.
-- Tools for select, pen, text, highlight, rectangle, ellipse, arrow, and numbered badges.
+- Tools for select, pen, text, highlight, rectangle, ellipse, arrow, and numbered stamps.
 - Reading mode rendering with flattened preview fallback and editable source data.
 - Context menu actions for annotating, copying the annotated image, and clearing annotations.
 

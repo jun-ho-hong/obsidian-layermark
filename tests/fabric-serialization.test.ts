@@ -44,4 +44,22 @@ describe("fabric serialization", () => {
 
     expect(objects).toEqual([]);
   });
+
+  it("preserves LayerMark arrow endpoints and stamp metadata in Fabric JSON", () => {
+    const scene = serializeFabricScene([
+      {
+        toObject: (properties) =>
+          Object.fromEntries(
+            (properties ?? []).map((property) => [property, property === "skitchKind" ? "arrow" : `${property}-value`])
+          )
+      }
+    ]);
+
+    expect(scene.objects[0]).toMatchObject({
+      skitchKind: "arrow",
+      skitchArrowStart: "skitchArrowStart-value",
+      skitchArrowEnd: "skitchArrowEnd-value",
+      skitchStampSize: "skitchStampSize-value"
+    });
+  });
 });

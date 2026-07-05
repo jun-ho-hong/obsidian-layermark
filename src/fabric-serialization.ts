@@ -8,7 +8,16 @@ export type FabricSceneJson = {
   objects: Record<string, unknown>[];
 };
 
-export const SKITCH_FABRIC_PROPERTIES = ["skitchRole", "skitchKind", "skitchBadgeId", "skitchBadgePart"];
+export const SKITCH_FABRIC_PROPERTIES = [
+  "skitchRole",
+  "skitchKind",
+  "skitchBadgeId",
+  "skitchBadgePart",
+  "skitchArrowStart",
+  "skitchArrowEnd",
+  "skitchStampId",
+  "skitchStampSize"
+];
 
 export type FabricClearableCanvas<TObject> = {
   getObjects: () => TObject[];

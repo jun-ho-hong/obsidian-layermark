@@ -35,4 +35,25 @@ describe("LayerMark brand surface", () => {
     expect(overlaySource).not.toContain("skitch-layer-");
     expect(previewSource).not.toContain("skitch-layer-");
   });
+
+  it("uses stamp language instead of badge language in the user-facing editor", () => {
+    expect(editorSource).toContain('this.addToolButton(this.toolGroupEl, "stamp",');
+    expect(editorSource).toContain('"Stamp"');
+    expect(editorSource).not.toContain('"badge"');
+    expect(editorSource).not.toContain('"Badge"');
+    expect(css).toContain(".layermark-stamp-number-controls");
+    expect(css).not.toContain("badge-number");
+  });
+
+  it("configures arrows with endpoint handles instead of box scaling handles", () => {
+    expect(editorSource).toContain("applyArrowEndpointControls");
+    expect(editorSource).toContain("skitchArrowStart");
+    expect(editorSource).toContain("skitchArrowEnd");
+  });
+
+  it("remembers the last adjusted stamp size only within the open editor session", () => {
+    expect(editorSource).toContain("private lastStampSize");
+    expect(editorSource).toContain("syncLastStampSizeFromSelection");
+    expect(editorSource).toContain("skitchStampSize");
+  });
 });

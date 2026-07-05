@@ -169,9 +169,11 @@ export default class LayerMarkPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
+    const storedSettings = await this.loadData() as Partial<LayerMarkSettings> & { nextBadgeNumber?: number } | null;
     this.settings = {
       ...DEFAULT_SETTINGS,
-      ...(await this.loadData())
+      ...storedSettings,
+      nextStampNumber: storedSettings?.nextStampNumber ?? storedSettings?.nextBadgeNumber ?? DEFAULT_SETTINGS.nextStampNumber
     };
   }
 
